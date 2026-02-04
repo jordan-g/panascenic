@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="{{ site.Language.LanguageCode }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ block "title" . }}{{ with .Params.Title }}{{ . }} | {{ end }}{{ .Site.Title }}{{ end }}</title>
+    <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{if .IsPage}}{{ .Summary }}{{ else }}{{ with .Site.Params.description }}{{ . }}{{ end }}{{ end }}{{ end }}">
+    {{ hugo.Generator }}
+    <link rel="stylesheet" href="{{ "css/photography.css" | relURL }}">
+    {{ block "head" . }}{{ end }}
+</head>
+<body>
+    <div class="noise-overlay" aria-hidden="true"></div>
+    <header class="site-header">
+        <div class="container">
+            <div class="header-top">
+                <div class="header-left">
+                    <h1 class="site-title"><a href="{{ "/" | relURL }}">{{ .Site.Title }}</a></h1>
+                    <p class="site-subtitle">📸 things I find nice. A photo blog by Jordan Guerguiev.</p>
+                    <a href="https://instagram.com/panascenic" class="instagram-link" target="_blank" rel="noopener noreferrer">
+                        <svg class="instagram-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" fill="currentColor"/>
+                        </svg>
+                        <span>panascenic</span>
+                    </a>
+                </div>
+                <div class="header-controls">
+                    <button class="filter-toggle" id="filter-toggle" aria-label="Filter dog photos" title="Filter dog photos">
+                        <svg class="filter-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 6H21M7 12H17M11 18H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+                        <svg class="theme-icon moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M22 15.8442C20.6866 16.4382 19.2286 16.7688 17.6935 16.7688C11.9153 16.7688 7.23116 12.0847 7.23116 6.30654C7.23116 4.77135 7.5618 3.3134 8.15577 2C4.52576 3.64163 2 7.2947 2 11.5377C2 17.3159 6.68414 22 12.4623 22C16.7053 22 20.3584 19.4742 22 15.8442Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <svg class="theme-icon sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2V4M12 20V22M4 12H2M6.31412 6.31412L4.8999 4.8999M17.6859 6.31412L19.1001 4.8999M6.31412 17.69L4.8999 19.1042M17.6859 17.69L19.1001 19.1042M22 12H20M17 12C17 14.7614 14.7614 17 12 17C9.23858 17 7 14.7614 7 12C7 9.23858 9.23858 7 12 7C14.7614 7 17 9.23858 17 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <main class="main-content">
+        {{ block "main" . }}{{ end }}
+    </main>
+    
+    <footer class="site-footer">
+        <div class="container">
+            <p>&copy; {{ now.Year }} {{ .Site.Title }}</p>
+        </div>
+    </footer>
+    <script>
+        // Theme toggle functionality
+        (function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const html = document.documentElement;
+            
+            // Get saved theme preference or default to system preference
+            function getInitialTheme() {
+                const saved = localStorage.getItem('theme');
+                if (saved === 'dark' || saved === 'light') {
+                    return saved;
+                }
+                // Default to system preference
+                return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            // Apply theme
+            function setTheme(theme) {
+                html.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                updateIconVisibility(theme);
+            }
+            
+            // Update icon visibility based on theme
+            function updateIconVisibility(theme) {
+                const moonIcon = document.querySelector('.moon-icon');
+                const sunIcon = document.querySelector('.sun-icon');
+                if (moonIcon && sunIcon) {
+                    // Show moon when in light mode (to switch to dark)
+                    // Show sun when in dark mode (to switch to light)
+                    if (theme === 'dark') {
+                        moonIcon.style.display = 'none';
+                        sunIcon.style.display = 'block';
+                    } else {
+                        moonIcon.style.display = 'block';
+                        sunIcon.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Initialize theme on page load
+            const initialTheme = getInitialTheme();
+            setTheme(initialTheme);
+            
+            // Toggle theme on button click
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    const currentTheme = html.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    setTheme(newTheme);
+                });
+            }
+            
+            // Listen for system theme changes (only if no manual preference is set)
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                // Only update if user hasn't manually set a preference
+                if (!localStorage.getItem('theme')) {
+                    setTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+        })();
+        
+        // Photo filter functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const filterToggle = document.getElementById('filter-toggle');
+            
+            // Get saved filter preference
+            function getFilterState() {
+                const saved = localStorage.getItem('filterDogs');
+                return saved === 'true';
+            }
+            
+            // Apply filter
+            function applyFilter(filterActive) {
+                const photoItems = document.querySelectorAll('.photo-item');
+                const filterTags = ['dog', 'pet'];
+                
+                photoItems.forEach(function(item) {
+                    const tags = item.getAttribute('data-tags');
+                    const tagsArray = tags && tags.trim() ? tags.split(',').map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; }) : [];
+                    
+                    // Check if photo has dog or pet tag
+                    const hasDogTag = tagsArray.some(function(tag) {
+                        return filterTags.includes(tag.toLowerCase());
+                    });
+                    
+                    if (filterActive && hasDogTag) {
+                        item.style.display = 'none';
+                    } else {
+                        item.style.display = '';
+                    }
+                });
+                
+                // Update button state
+                if (filterToggle) {
+                    if (filterActive) {
+                        filterToggle.classList.add('active');
+                        filterToggle.setAttribute('aria-label', 'Show dog photos');
+                        filterToggle.setAttribute('title', 'Show dog photos');
+                    } else {
+                        filterToggle.classList.remove('active');
+                        filterToggle.setAttribute('aria-label', 'Filter dog photos');
+                        filterToggle.setAttribute('title', 'Filter dog photos');
+                    }
+                }
+                
+                localStorage.setItem('filterDogs', filterActive.toString());
+            }
+            
+            // Initialize filter on page load
+            const initialFilterState = getFilterState();
+            applyFilter(initialFilterState);
+            
+            // Toggle filter on button click
+            if (filterToggle) {
+                filterToggle.addEventListener('click', function() {
+                    const currentState = getFilterState();
+                    applyFilter(!currentState);
+                });
+            }
+        });
+        
+        // Photo expand/collapse functionality (desktop only)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Only enable on desktop (screen width >= 769px)
+            function isDesktop() {
+                return window.innerWidth >= 769;
+            }
+
+            const photoImages = document.querySelectorAll('.photo-large');
+            photoImages.forEach(function(img) {
+                // Only add click handler on desktop
+                if (isDesktop()) {
+                    img.addEventListener('click', function() {
+                        this.classList.toggle('expanded');
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

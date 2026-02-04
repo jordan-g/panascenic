@@ -1,0 +1,36 @@
+{{ define "main" }}
+<div class="container">
+    <div class="photo-grid">
+        {{ range where .Site.RegularPages "Section" "photos" }}
+        {{ $tags := .Params.tags | default (slice) }}
+        {{ $tagsLower := slice }}
+        {{ range $tags }}
+            {{ $tagsLower = $tagsLower | append (lower .) }}
+        {{ end }}
+        <article class="photo-item" data-tags="{{ delimit $tagsLower "," }}">
+            <a href="{{ .RelPermalink }}" class="photo-link">
+                {{ $image := .Resources.GetMatch "image.*" }}
+                {{ if not $image }}
+                    {{ $image = .Resources.GetMatch "*image*" }}
+                {{ end }}
+                {{ if not $image }}
+                    {{ $image = index (.Resources.ByType "image") 0 }}
+                {{ end }}
+                {{ if $image }}
+                    {{ $thumbnail := $image.Fill "600x750" }}
+                    <img src="{{ $thumbnail.RelPermalink }}" alt="{{ .Title }}" class="photo-thumbnail" loading="lazy">
+                {{ else if .Params.image }}
+                    <img src="{{ .Params.image | relURL }}" alt="{{ .Title }}" class="photo-thumbnail" loading="lazy">
+                {{ end }}
+                {{ if .Title }}
+                <div class="photo-overlay">
+                    <h2 class="photo-title">{{ .Title }}</h2>
+                </div>
+                {{ end }}
+            </a>
+        </article>
+        {{ end }}
+    </div>
+</div>
+{{ end }}
+

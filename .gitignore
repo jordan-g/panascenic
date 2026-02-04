@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Editor temp files
+content/photos/temp/
+
+# Hugo
+public/
+resources/_gen/
+
+# OS
+.DS_Store
+Thumbs.db
+

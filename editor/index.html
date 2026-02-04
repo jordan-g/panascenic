@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Management - Panascenic</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Photo Management</h1>
+            <p class="subtitle">Manage your photos and posts</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Management View -->
+            <div id="managementView" class="management-view">
+                <div class="toolbar">
+                    <button id="addPostBtn" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Photos
+                    </button>
+                    <button id="selectModeBtn" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 11 12 14 22 4"></polyline>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        Select
+                    </button>
+                    <button id="deleteSelectedBtn" class="btn btn-danger" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Delete Selected (<span id="selectedCount">0</span>)
+                    </button>
+                    <button id="cancelSelectBtn" class="btn btn-secondary" style="display: none;">
+                        Cancel
+                    </button>
+                    <button id="refreshBtn" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div id="postsList" class="posts-list">
+                    <div class="loading">Loading posts...</div>
+                </div>
+                
+                <div id="listMessage" class="message" style="display: none;"></div>
+            </div>
+
+            <!-- Add/Edit Form View -->
+            <div id="formView" class="form-view" style="display: none;">
+                <div class="form-header">
+                    <h2 id="formTitle">Add New Post</h2>
+                    <button id="backBtn" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Back to List
+                    </button>
+                </div>
+
+                <form id="photoForm" class="upload-form">
+                    <div class="form-group">
+                        <label for="photoInput" class="file-label">
+                            <div class="file-input-wrapper">
+                                <input type="file" id="photoInput" name="photo" accept="image/*,.heic,.heif" multiple>
+                                <div class="file-input-display">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="17 8 12 3 7 8"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                    <span class="file-input-text" id="fileInputText">Choose photos (you can select multiple)</span>
+                                    <span class="file-input-name" id="fileName"></span>
+                                </div>
+                            </div>
+                        </label>
+                        <div id="previewContainer" class="preview-container" style="display: none;">
+                            <div id="previewGrid" class="preview-grid"></div>
+                        </div>
+                        <div id="currentImageContainer" class="current-image-container" style="display: none;">
+                            <p class="current-image-label">Current image:</p>
+                            <img id="currentImage" src="" alt="Current">
+                        </div>
+                        
+                        <!-- Thumbnail Crop Tool (edit mode only) -->
+                        <div id="cropSection" class="crop-section" style="display: none;">
+                            <p class="crop-section-label">Thumbnail Crop</p>
+                            <p class="crop-section-hint">Drag to position, pinch/scroll to resize. Maintains 4:5 aspect ratio.</p>
+                            <div class="crop-container">
+                                <div id="cropWrapper" class="crop-wrapper">
+                                    <img id="cropImage" src="" alt="Crop source">
+                                    <div id="cropOverlay" class="crop-overlay">
+                                        <div id="cropBox" class="crop-box">
+                                            <div class="crop-handles">
+                                                <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                                                <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                                                <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                                                <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="crop-preview-section">
+                                <p class="crop-preview-label">Thumbnail Preview:</p>
+                                <div class="crop-preview-wrapper">
+                                    <canvas id="cropPreview" width="120" height="150"></canvas>
+                                </div>
+                            </div>
+                            <div class="crop-actions">
+                                <button type="button" id="resetCropBtn" class="btn btn-secondary btn-sm">Reset to Full Image</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Dark Mode Image (edit mode only) -->
+                        <div id="darkModeSection" class="dark-mode-section" style="display: none;">
+                            <p class="dark-mode-label">Dark Mode Version (optional)</p>
+                            <p class="dark-mode-hint">Upload an alternate image to show when dark mode is active.</p>
+                            <div class="dark-mode-upload">
+                                <label for="darkModeInput" class="file-label dark-mode-file-label">
+                                    <div class="file-input-wrapper dark-mode-wrapper">
+                                        <input type="file" id="darkModeInput" name="darkModePhoto" accept="image/*,.heic,.heif">
+                                        <div class="file-input-display dark-mode-display">
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                            </svg>
+                                            <span class="file-input-text" id="darkModeFileText">Choose dark mode image</span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div id="darkModePreview" class="dark-mode-preview" style="display: none;">
+                                <p class="current-image-label">Current dark mode image:</p>
+                                <img id="darkModeImage" src="" alt="Dark mode">
+                                <button type="button" id="removeDarkModeBtn" class="btn btn-danger btn-sm">Remove Dark Mode Image</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Batch upload info - shown when multiple files selected -->
+                    <div id="batchInfo" class="batch-info" style="display: none;">
+                        <p><strong><span id="batchCount">0</span> photos selected</strong> - Each will be created as a separate post</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="titleInput">Title (optional)</label>
+                        <input type="text" id="titleInput" name="title" placeholder="Enter photo title (leave blank to use date)">
+                        <small class="form-hint">For batch uploads, each photo will use this title or be auto-named</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="descriptionInput">Description</label>
+                        <textarea id="descriptionInput" name="description" rows="4" placeholder="Enter photo description (optional)"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tagsInput">Tags</label>
+                        <input type="text" id="tagsInput" name="tags" placeholder="Enter tags separated by commas (e.g. nature, landscape, travel)">
+                        <small class="form-hint">Separate multiple tags with commas</small>
+                    </div>
+
+                    <div class="form-group" id="draftGroup" style="display: none;">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="draftInput" name="draft">
+                            <span>Save as draft</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn" id="submitBtn">
+                            <span class="btn-text" id="submitBtnText">Upload & Create Post</span>
+                            <span class="btn-loader" style="display: none;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <button type="button" id="deleteBtn" class="btn btn-danger" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Delete Post
+                        </button>
+                    </div>
+                    
+                    <!-- Progress bar for batch uploads -->
+                    <div id="uploadProgress" class="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <p id="progressText" class="progress-text">Uploading 0 of 0...</p>
+                    </div>
+
+                    <div id="message" class="message" style="display: none;"></div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

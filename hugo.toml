@@ -1,0 +1,7 @@
+baseURL = 'https://example.org/'
+languageCode = 'en-us'
+title = 'panascenic'
+theme = 'ananke'
+
+[params]
+description = 'A simple, clean photography portfolio'

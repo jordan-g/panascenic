@@ -1,0 +1,36 @@
+{{ define "main" }}
+<div class="container">
+    <article class="photo-single">
+        <div class="photo-wrapper">
+            {{ $image := .Resources.GetMatch "image.*" }}
+            {{ if not $image }}
+                {{ $image = .Resources.GetMatch "*image*" }}
+            {{ end }}
+            {{ if not $image }}
+                {{ $image = index (.Resources.ByType "image") 0 }}
+            {{ end }}
+            {{ if $image }}
+                <img src="{{ $image.RelPermalink }}" alt="{{ .Title }}" class="photo-large">
+            {{ else if .Params.image }}
+                <img src="{{ .Params.image | relURL }}" alt="{{ .Title }}" class="photo-large">
+            {{ end }}
+        </div>
+        
+        <div class="photo-info">
+            {{ if .Title }}
+            <h1 class="photo-title">{{ .Title }}</h1>
+            {{ end }}
+            {{ if .Content }}
+            <div class="photo-description">
+                {{ .Content }}
+            </div>
+            {{ end }}
+        </div>
+        
+        <div class="photo-navigation">
+            <a href="{{ "/" | relURL }}" class="back-link">← Back to Gallery</a>
+        </div>
+    </article>
+</div>
+{{ end }}
+
