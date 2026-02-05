@@ -4,9 +4,18 @@ const path = require('path');
 const fs = require('fs-extra');
 const { exec, spawn } = require('child_process');
 const convert = require('heic-convert');
+const sharp = require('sharp');
 
 const app = express();
 const PORT = 3001;
+
+// Debounce timer for Hugo restart
+let hugoRestartTimer = null;
+const HUGO_RESTART_DEBOUNCE_MS = 2000; // Wait 2 seconds after last upload before restarting
+
+// Thumbnail dimensions (4:5 aspect ratio to match gallery)
+const THUMBNAIL_WIDTH = 600;
+const THUMBNAIL_HEIGHT = 750;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -22,22 +31,34 @@ const storage = multer.diskStorage({
   }
 });
 
+const fileFilter = (req, file, cb) => {
+  const allowedExts = /jpeg|jpg|png|gif|webp|heic|heif/;
+  const allowedMimes = /jpeg|jpg|png|gif|webp|heic|heif/;
+  const extname = allowedExts.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedMimes.test(file.mimetype) || file.mimetype === 'image/heic' || file.mimetype === 'image/heif';
+  
+  if (extname || mimetype) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'));
+  }
+};
+
 const upload = multer({ 
   storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedExts = /jpeg|jpg|png|gif|webp|heic|heif/;
-    const allowedMimes = /jpeg|jpg|png|gif|webp|heic|heif/;
-    const extname = allowedExts.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedMimes.test(file.mimetype) || file.mimetype === 'image/heic' || file.mimetype === 'image/heif';
-    
-    if (extname || mimetype) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
-    }
-  }
+  fileFilter: fileFilter
 });
+
+// Multi-file upload configuration for edit endpoint (main photo + dark mode photo)
+const uploadFields = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: fileFilter
+}).fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'darkModePhoto', maxCount: 1 }
+]);
 
 // Helper function to convert HEIC to JPEG
 async function convertHeicToJpeg(inputPath) {
@@ -83,10 +104,12 @@ app.use((req, res, next) => {
 function createSlug(title) {
   const now = new Date();
   const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  // Add millisecond timestamp + random to guarantee uniqueness in batch uploads
+  const uniqueSuffix = now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
   
   if (!title || title.trim() === '') {
-    // Use timestamp-based slug when no title
-    return timestamp;
+    // Use timestamp-based slug with unique suffix when no title
+    return `${timestamp}-${uniqueSuffix}`;
   }
   
   const baseSlug = title
@@ -96,9 +119,8 @@ function createSlug(title) {
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
   
-  // Append short timestamp to allow duplicate titles
-  const shortTimestamp = now.getTime().toString(36);
-  return `${baseSlug}-${shortTimestamp}`;
+  // Append unique suffix to allow duplicate titles
+  return `${baseSlug}-${uniqueSuffix}`;
 }
 
 // Helper function to restart Hugo server
@@ -114,6 +136,19 @@ function findHugoProcess() {
       }
     });
   });
+}
+
+// Debounced Hugo restart - waits for uploads to finish before restarting
+function debouncedHugoRestart() {
+  if (hugoRestartTimer) {
+    clearTimeout(hugoRestartTimer);
+  }
+  hugoRestartTimer = setTimeout(() => {
+    hugoRestartTimer = null;
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+  }, HUGO_RESTART_DEBOUNCE_MS);
 }
 
 function restartHugoServer() {
@@ -232,10 +267,8 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     const markdownPath = path.join(photoDir, 'index.md');
     await fs.writeFile(markdownPath, markdownContent);
 
-    // Restart Hugo server asynchronously (don't wait)
-    restartHugoServer().catch(error => {
-      console.error('Error restarting Hugo server:', error);
-    });
+    // Schedule Hugo restart (debounced - waits for batch uploads to complete)
+    debouncedHugoRestart();
 
     // Respond immediately
     res.json({ 
@@ -263,15 +296,28 @@ function parseFrontmatter(content) {
   const body = match[2];
   const frontmatter = {};
   
+  let currentTable = null;
+  
   // Simple TOML parser for our use case
   frontmatterText.split('\n').forEach(line => {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return;
     
-    const match = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
-    if (match) {
-      const key = match[1];
-      let value = match[2].trim();
+    // Check for table header (e.g., [thumbnailCrop])
+    const tableMatch = trimmed.match(/^\[(\w+)\]$/);
+    if (tableMatch) {
+      currentTable = tableMatch[1];
+      frontmatter[currentTable] = {};
+      return;
+    }
+    
+    const kvMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
+    if (kvMatch) {
+      const key = kvMatch[1];
+      let value = kvMatch[2].trim();
+      
+      // Parse the value
+      let parsedValue;
       
       // Parse arrays (e.g., tags = ['dog', 'pet'])
       if (value.startsWith('[') && value.endsWith(']')) {
@@ -283,7 +329,7 @@ function parseFrontmatter(content) {
         while ((itemMatch = itemRegex.exec(arrayContent)) !== null) {
           items.push(itemMatch[1]);
         }
-        frontmatter[key] = items;
+        parsedValue = items;
       }
       // Remove quotes if present
       else if ((value.startsWith("'") && value.endsWith("'")) || 
@@ -291,15 +337,25 @@ function parseFrontmatter(content) {
         value = value.slice(1, -1);
         // Unescape single quotes
         value = value.replace(/''/g, "'");
-        frontmatter[key] = value;
+        parsedValue = value;
       }
       // Parse dates
       else if (value.match(/^\d{4}-\d{2}-\d{2}/)) {
-        frontmatter[key] = value;
+        parsedValue = value;
       } else if (value === 'true' || value === 'false') {
-        frontmatter[key] = value === 'true';
+        parsedValue = value === 'true';
+      } else if (!isNaN(parseFloat(value))) {
+        // Parse numbers
+        parsedValue = parseFloat(value);
       } else {
-        frontmatter[key] = value;
+        parsedValue = value;
+      }
+      
+      // Add to current table or root
+      if (currentTable) {
+        frontmatter[currentTable][key] = parsedValue;
+      } else {
+        frontmatter[key] = parsedValue;
       }
     }
   });
@@ -310,6 +366,8 @@ function parseFrontmatter(content) {
 // Helper function to generate frontmatter string
 function generateFrontmatter(frontmatter, body) {
   let result = '+++\n';
+  let tables = []; // Store tables to add at the end
+  
   for (const [key, value] of Object.entries(frontmatter)) {
     if (Array.isArray(value)) {
       // Handle arrays (e.g., tags)
@@ -323,10 +381,29 @@ function generateFrontmatter(frontmatter, body) {
       // Escape single quotes
       const escaped = value.replace(/'/g, "''");
       result += `${key} = '${escaped}'\n`;
+    } else if (typeof value === 'object' && value !== null) {
+      // Handle nested objects as TOML tables
+      let tableStr = `\n[${key}]\n`;
+      for (const [subKey, subValue] of Object.entries(value)) {
+        if (typeof subValue === 'number') {
+          tableStr += `${subKey} = ${subValue}\n`;
+        } else if (typeof subValue === 'boolean') {
+          tableStr += `${subKey} = ${subValue}\n`;
+        } else if (typeof subValue === 'string') {
+          tableStr += `${subKey} = '${subValue.replace(/'/g, "''")}'\n`;
+        }
+      }
+      tables.push(tableStr);
+    } else if (typeof value === 'number') {
+      result += `${key} = ${value}\n`;
     } else {
       result += `${key} = ${value}\n`;
     }
   }
+  
+  // Add tables at the end
+  result += tables.join('');
+  
   result += '+++\n\n';
   if (body) {
     result += body;
@@ -351,11 +428,165 @@ async function findImageFile(dir) {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
   for (const file of files) {
     const ext = path.extname(file).toLowerCase();
-    if (imageExtensions.includes(ext) && file !== 'index.md') {
+    // Skip dark mode, thumbnail, and markdown files
+    if (imageExtensions.includes(ext) && 
+        !file.startsWith('image-dark') && 
+        !file.startsWith('thumbnail') &&
+        file !== 'index.md') {
       return file;
     }
   }
   return null;
+}
+
+// Helper function to find dark mode image file
+async function findDarkModeImage(dir) {
+  const files = await fs.readdir(dir);
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const file of files) {
+    const ext = path.extname(file).toLowerCase();
+    if (imageExtensions.includes(ext) && file.startsWith('image-dark')) {
+      return file;
+    }
+  }
+  return null;
+}
+
+// Helper function to find custom thumbnail
+async function findThumbnailFile(dir) {
+  const files = await fs.readdir(dir);
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const file of files) {
+    const ext = path.extname(file).toLowerCase();
+    if (imageExtensions.includes(ext) && file.startsWith('thumbnail')) {
+      return file;
+    }
+  }
+  return null;
+}
+
+// Generate framed image with border baked in
+async function generateFramedImage(imagePath, outputPath, frameData) {
+  try {
+    const image = sharp(imagePath);
+    const metadata = await image.metadata();
+    
+    // Parse frame color to RGB
+    const hexColor = frameData.color || '#FFFFFF';
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    
+    // Calculate border size based on inset percentage
+    // Use the smaller dimension to calculate border size for consistency
+    const minDimension = Math.min(metadata.width, metadata.height);
+    const insetPercent = (frameData.insetWidth || 10) / 100;
+    const borderSize = Math.round(minDimension * insetPercent * 0.15); // Scale factor for reasonable border
+    
+    let pipeline = sharp(imagePath);
+    
+    if (frameData.type === 'even') {
+      // Even border on all sides
+      pipeline = pipeline.extend({
+        top: borderSize,
+        bottom: borderSize,
+        left: borderSize,
+        right: borderSize,
+        background: { r, g, b, alpha: 1 }
+      });
+    } else {
+      // Aspect ratio frame - calculate padding to achieve target ratio
+      const [targetW, targetH] = frameData.type.split(':').map(Number);
+      const targetRatio = targetW / targetH;
+      const currentRatio = metadata.width / metadata.height;
+      
+      let padTop = borderSize;
+      let padBottom = borderSize;
+      let padLeft = borderSize;
+      let padRight = borderSize;
+      
+      // First add minimum border
+      const newWidth = metadata.width + (borderSize * 2);
+      const newHeight = metadata.height + (borderSize * 2);
+      const newRatio = newWidth / newHeight;
+      
+      // Then add extra padding to achieve target aspect ratio
+      if (newRatio < targetRatio) {
+        // Need to add horizontal padding
+        const targetWidth = Math.round(newHeight * targetRatio);
+        const extraPad = Math.round((targetWidth - newWidth) / 2);
+        padLeft += extraPad;
+        padRight += extraPad;
+      } else if (newRatio > targetRatio) {
+        // Need to add vertical padding
+        const targetHeight = Math.round(newWidth / targetRatio);
+        const extraPad = Math.round((targetHeight - newHeight) / 2);
+        padTop += extraPad;
+        padBottom += extraPad;
+      }
+      
+      pipeline = pipeline.extend({
+        top: padTop,
+        bottom: padBottom,
+        left: padLeft,
+        right: padRight,
+        background: { r, g, b, alpha: 1 }
+      });
+    }
+    
+    await pipeline.jpeg({ quality: 92 }).toFile(outputPath);
+    
+    console.log(`Generated framed image: ${outputPath}`);
+    return true;
+  } catch (error) {
+    console.error('Error generating framed image:', error);
+    return false;
+  }
+}
+
+// Helper function to find framed image file
+async function findFramedImage(dir) {
+  const files = await fs.readdir(dir);
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  for (const file of files) {
+    const ext = path.extname(file).toLowerCase();
+    if (imageExtensions.includes(ext) && file.startsWith('image-framed')) {
+      return file;
+    }
+  }
+  return null;
+}
+
+// Generate thumbnail from image with crop data
+async function generateThumbnail(imagePath, outputPath, cropData) {
+  try {
+    const image = sharp(imagePath);
+    const metadata = await image.metadata();
+    
+    // Calculate crop region in pixels
+    const cropX = Math.round(cropData.x * metadata.width);
+    const cropY = Math.round(cropData.y * metadata.height);
+    const cropW = Math.round(cropData.width * metadata.width);
+    const cropH = Math.round(cropData.height * metadata.height);
+    
+    // Ensure valid crop dimensions
+    const safeX = Math.max(0, Math.min(cropX, metadata.width - 1));
+    const safeY = Math.max(0, Math.min(cropY, metadata.height - 1));
+    const safeW = Math.min(cropW, metadata.width - safeX);
+    const safeH = Math.min(cropH, metadata.height - safeY);
+    
+    await image
+      .extract({ left: safeX, top: safeY, width: safeW, height: safeH })
+      .resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover' })
+      .jpeg({ quality: 85 })
+      .toFile(outputPath);
+    
+    console.log(`Generated thumbnail: ${outputPath}`);
+    return true;
+  } catch (error) {
+    console.error('Error generating thumbnail:', error);
+    return false;
+  }
 }
 
 // List all posts
@@ -374,8 +605,15 @@ app.get('/api/posts', async (req, res) => {
           const content = await fs.readFile(indexPath, 'utf-8');
           const { frontmatter, body } = parseFrontmatter(content);
           const imageFile = await findImageFile(postDir);
+          const darkModeFile = await findDarkModeImage(postDir);
+          const thumbnailFile = await findThumbnailFile(postDir);
+          const framedFile = await findFramedImage(postDir);
           
           const imagePath = imageFile ? `/photos/${encodeURIComponent(entry.name)}/${encodeURIComponent(imageFile)}` : null;
+          const darkModeImagePath = darkModeFile ? `/photos/${encodeURIComponent(entry.name)}/${encodeURIComponent(darkModeFile)}` : null;
+          const thumbnailPath = thumbnailFile ? `/photos/${encodeURIComponent(entry.name)}/${encodeURIComponent(thumbnailFile)}` : null;
+          const framedImagePath = framedFile ? `/photos/${encodeURIComponent(entry.name)}/${encodeURIComponent(framedFile)}` : null;
+          
           posts.push({
             slug: entry.name,
             title: frontmatter.title || '',
@@ -383,7 +621,12 @@ app.get('/api/posts', async (req, res) => {
             draft: frontmatter.draft || false,
             tags: frontmatter.tags || [],
             description: body.trim(),
-            image: imagePath
+            image: imagePath,
+            darkModeImage: darkModeImagePath,
+            thumbnail: thumbnailPath,
+            thumbnailCrop: frontmatter.thumbnailCrop || null,
+            frame: frontmatter.frame || null,
+            framedImage: framedImagePath
           });
         }
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
@@ -429,11 +672,16 @@ app.get('/api/posts/:slug', async (req, res) => {
     const postDir = path.join(photosDir, slug);
     const indexPath = path.join(postDir, 'index.md');
     
-    let content, imageFile;
+    let content, imageFile, darkModeFile, thumbnailFile, framedFile;
+    let isDir = false;
     
     if (await fs.pathExists(indexPath)) {
       content = await fs.readFile(indexPath, 'utf-8');
       imageFile = await findImageFile(postDir);
+      darkModeFile = await findDarkModeImage(postDir);
+      thumbnailFile = await findThumbnailFile(postDir);
+      framedFile = await findFramedImage(postDir);
+      isDir = true;
     } else {
       // Try markdown file directly
       const filePath = path.join(photosDir, `${slug}.md`);
@@ -450,6 +698,18 @@ app.get('/api/posts/:slug', async (req, res) => {
       ? `/photos/${encodeURIComponent(slug)}/${encodeURIComponent(imageFile)}`
       : (frontmatter.image || null);
     
+    const darkModeImagePath = darkModeFile
+      ? `/photos/${encodeURIComponent(slug)}/${encodeURIComponent(darkModeFile)}`
+      : null;
+    
+    const thumbnailPath = thumbnailFile
+      ? `/photos/${encodeURIComponent(slug)}/${encodeURIComponent(thumbnailFile)}`
+      : null;
+    
+    const framedImagePath = framedFile
+      ? `/photos/${encodeURIComponent(slug)}/${encodeURIComponent(framedFile)}`
+      : null;
+    
     res.json({
       slug,
       title: frontmatter.title || '',
@@ -458,7 +718,15 @@ app.get('/api/posts/:slug', async (req, res) => {
       tags: frontmatter.tags || [],
       description: body.trim(),
       image: imagePath,
-      isDirectory: await fs.pathExists(indexPath)
+      darkModeImage: darkModeImagePath,
+      thumbnail: thumbnailPath,
+      thumbnailCrop: frontmatter.thumbnailCrop || null,
+      frame: frontmatter.frame || null,
+      framedImage: framedImagePath,
+      isDirectory: isDir,
+      photoDate: frontmatter.photoDate || '',
+      camera: frontmatter.camera || '',
+      location: frontmatter.location || null
     });
   } catch (error) {
     console.error('Error getting post:', error);
@@ -467,10 +735,12 @@ app.get('/api/posts/:slug', async (req, res) => {
 });
 
 // Update a post (with optional photo upload)
-app.put('/api/posts/:slug', upload.single('photo'), async (req, res) => {
+app.put('/api/posts/:slug', uploadFields, async (req, res) => {
   try {
     const { slug } = req.params;
-    const { title, description, tags, draft } = req.body;
+    const { title, description, tags, draft, thumbnailCrop, frame, removeDarkMode, photoDate, camera, location } = req.body;
+    const photoFile = req.files && req.files['photo'] ? req.files['photo'][0] : null;
+    const darkModeFile = req.files && req.files['darkModePhoto'] ? req.files['darkModePhoto'][0] : null;
     
     // Title is optional now
     
@@ -489,39 +759,42 @@ app.put('/api/posts/:slug', upload.single('photo'), async (req, res) => {
       if (await fs.pathExists(filePath)) {
         existingContent = await fs.readFile(filePath, 'utf-8');
       } else {
-        // Clean up uploaded file if present
-        if (req.file) {
-          await fs.remove(req.file.path);
-        }
+        // Clean up uploaded files if present
+        if (photoFile) await fs.remove(photoFile.path);
+        if (darkModeFile) await fs.remove(darkModeFile.path);
         return res.status(404).json({ error: 'Post not found' });
       }
     }
     
-    // Handle photo replacement if a new photo was uploaded
-    if (req.file && isDirectory) {
+    // Handle main photo replacement if a new photo was uploaded
+    if (photoFile && isDirectory) {
       // Convert HEIC to JPEG if needed
-      let processedFilePath = req.file.path;
-      let imageExt = path.extname(req.file.path);
+      let processedFilePath = photoFile.path;
+      let imageExt = path.extname(photoFile.path);
       
-      if (isHeicFile(req.file.path)) {
+      if (isHeicFile(photoFile.path)) {
         try {
           console.log('Converting HEIC to JPEG...');
-          processedFilePath = await convertHeicToJpeg(req.file.path);
+          processedFilePath = await convertHeicToJpeg(photoFile.path);
           imageExt = '.jpg';
           console.log('HEIC conversion complete');
         } catch (convError) {
           console.error('HEIC conversion error:', convError);
-          await fs.remove(req.file.path);
+          await fs.remove(photoFile.path);
+          if (darkModeFile) await fs.remove(darkModeFile.path);
           return res.status(400).json({ error: 'Failed to convert HEIC file. Please try a different format.' });
         }
       }
       
-      // Find and remove old image files
+      // Find and remove old main image files (not dark mode or thumbnail)
       const files = await fs.readdir(postDir);
       const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
       for (const file of files) {
         const ext = path.extname(file).toLowerCase();
-        if (imageExtensions.includes(ext) && file !== 'index.md') {
+        if (imageExtensions.includes(ext) && 
+            !file.startsWith('image-dark') && 
+            !file.startsWith('thumbnail') &&
+            file !== 'index.md') {
           await fs.remove(path.join(postDir, file));
         }
       }
@@ -530,15 +803,64 @@ app.put('/api/posts/:slug', upload.single('photo'), async (req, res) => {
       const imageName = 'image' + imageExt;
       const finalImagePath = path.join(postDir, imageName);
       await fs.move(processedFilePath, finalImagePath);
-    } else if (req.file) {
+      
+      // Remove old thumbnail since image changed
+      const oldThumbnail = await findThumbnailFile(postDir);
+      if (oldThumbnail) {
+        await fs.remove(path.join(postDir, oldThumbnail));
+      }
+    } else if (photoFile) {
       // If not a directory post, clean up the uploaded file
-      await fs.remove(req.file.path);
+      await fs.remove(photoFile.path);
     }
     
-    const { frontmatter } = parseFrontmatter(existingContent);
+    // Handle dark mode image
+    if (removeDarkMode === 'true' && isDirectory) {
+      // Remove dark mode image
+      const oldDarkMode = await findDarkModeImage(postDir);
+      if (oldDarkMode) {
+        await fs.remove(path.join(postDir, oldDarkMode));
+        console.log('Removed dark mode image');
+      }
+    } else if (darkModeFile && isDirectory) {
+      // Convert HEIC if needed
+      let processedDarkPath = darkModeFile.path;
+      let darkExt = path.extname(darkModeFile.path);
+      
+      if (isHeicFile(darkModeFile.path)) {
+        try {
+          processedDarkPath = await convertHeicToJpeg(darkModeFile.path);
+          darkExt = '.jpg';
+        } catch (convError) {
+          console.error('HEIC conversion error for dark mode:', convError);
+          await fs.remove(darkModeFile.path);
+          return res.status(400).json({ error: 'Failed to convert dark mode HEIC file.' });
+        }
+      }
+      
+      // Remove old dark mode images
+      const files = await fs.readdir(postDir);
+      for (const file of files) {
+        if (file.startsWith('image-dark')) {
+          await fs.remove(path.join(postDir, file));
+        }
+      }
+      
+      // Move new dark mode image
+      const darkImageName = 'image-dark' + darkExt;
+      const finalDarkPath = path.join(postDir, darkImageName);
+      await fs.move(processedDarkPath, finalDarkPath);
+      console.log('Added dark mode image');
+    } else if (darkModeFile) {
+      await fs.remove(darkModeFile.path);
+    }
     
-    // Update frontmatter - title can be empty
-    frontmatter.title = (title && title.trim()) || '';
+    const { frontmatter, body: existingBody } = parseFrontmatter(existingContent);
+    
+    // Update frontmatter - only update if field was provided (for partial updates like inline editing)
+    if (title !== undefined) {
+      frontmatter.title = title.trim();
+    }
     if (draft !== undefined) {
       frontmatter.draft = draft === 'true' || draft === true;
     }
@@ -553,8 +875,103 @@ app.put('/api/posts/:slug', upload.single('photo'), async (req, res) => {
       }
     }
     
-    // Generate new content
-    const newContent = generateFrontmatter(frontmatter, description || '');
+    // Update photo date (when the photo was taken)
+    if (photoDate !== undefined) {
+      if (photoDate && photoDate.trim()) {
+        frontmatter.photoDate = photoDate.trim();
+      } else {
+        delete frontmatter.photoDate;
+      }
+    }
+    
+    // Update camera
+    if (camera !== undefined) {
+      if (camera && camera.trim()) {
+        frontmatter.camera = camera.trim();
+      } else {
+        delete frontmatter.camera;
+      }
+    }
+    
+    // Update location
+    if (location !== undefined) {
+      try {
+        const locationParsed = location ? JSON.parse(location) : null;
+        if (locationParsed && locationParsed.name) {
+          frontmatter.location = {
+            name: locationParsed.name,
+            lat: locationParsed.lat,
+            lng: locationParsed.lng
+          };
+        } else {
+          delete frontmatter.location;
+        }
+      } catch (parseError) {
+        console.error('Error parsing location data:', parseError);
+      }
+    }
+    
+    // Handle thumbnail crop data
+    if (thumbnailCrop && isDirectory) {
+      try {
+        const cropDataParsed = JSON.parse(thumbnailCrop);
+        frontmatter.thumbnailCrop = cropDataParsed;
+        
+        // Find the main image to generate thumbnail from
+        const mainImage = await findImageFile(postDir);
+        if (mainImage) {
+          const mainImagePath = path.join(postDir, mainImage);
+          const thumbnailPath = path.join(postDir, 'thumbnail.jpg');
+          
+          // Remove old thumbnail if exists
+          const oldThumbnail = await findThumbnailFile(postDir);
+          if (oldThumbnail && oldThumbnail !== 'thumbnail.jpg') {
+            await fs.remove(path.join(postDir, oldThumbnail));
+          }
+          
+          // Generate new thumbnail
+          await generateThumbnail(mainImagePath, thumbnailPath, cropDataParsed);
+        }
+      } catch (parseError) {
+        console.error('Error parsing thumbnail crop data:', parseError);
+      }
+    }
+    
+    // Handle frame data
+    if (frame && isDirectory) {
+      try {
+        const frameParsed = JSON.parse(frame);
+        
+        // Remove old framed image first
+        const oldFramed = await findFramedImage(postDir);
+        if (oldFramed) {
+          await fs.remove(path.join(postDir, oldFramed));
+          console.log('Removed old framed image');
+        }
+        
+        // Only generate frame if type is not 'none'
+        if (frameParsed.type && frameParsed.type !== 'none') {
+          frontmatter.frame = frameParsed;
+          
+          // Generate framed image from original
+          const mainImage = await findImageFile(postDir);
+          if (mainImage) {
+            const mainImagePath = path.join(postDir, mainImage);
+            const framedImagePath = path.join(postDir, 'image-framed.jpg');
+            await generateFramedImage(mainImagePath, framedImagePath, frameParsed);
+          }
+        } else {
+          // Remove frame from frontmatter if type is 'none'
+          delete frontmatter.frame;
+        }
+      } catch (parseError) {
+        console.error('Error parsing frame data:', parseError);
+      }
+    }
+    
+    // Generate new content - preserve existing description if not provided (for partial updates)
+    const finalDescription = description !== undefined ? description : existingBody;
+    const newContent = generateFrontmatter(frontmatter, finalDescription || '');
     
     // Write back
     if (isDirectory) {
@@ -571,12 +988,13 @@ app.put('/api/posts/:slug', upload.single('photo'), async (req, res) => {
     res.json({ success: true, message: 'Post updated successfully' });
   } catch (error) {
     console.error('Error updating post:', error);
-    // Clean up uploaded file if present
-    if (req.file) {
+    // Clean up uploaded files if present
+    if (req.files) {
       try {
-        await fs.remove(req.file.path);
+        if (req.files['photo']) await fs.remove(req.files['photo'][0].path);
+        if (req.files['darkModePhoto']) await fs.remove(req.files['darkModePhoto'][0].path);
       } catch (cleanupError) {
-        console.error('Error cleaning up uploaded file:', cleanupError);
+        console.error('Error cleaning up uploaded files:', cleanupError);
       }
     }
     res.status(500).json({ error: error.message || 'Failed to update post' });
@@ -668,6 +1086,522 @@ app.post('/api/posts/batch-delete', express.json(), async (req, res) => {
   } catch (error) {
     console.error('Error batch deleting posts:', error);
     res.status(500).json({ error: error.message || 'Failed to delete posts' });
+  }
+});
+
+// Batch update posts
+app.post('/api/posts/batch-update', express.json(), async (req, res) => {
+  try {
+    const { slugs, updates } = req.body;
+    
+    if (!Array.isArray(slugs) || slugs.length === 0) {
+      return res.status(400).json({ error: 'No posts specified for update' });
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      return res.status(400).json({ error: 'No updates specified' });
+    }
+    
+    const photosDir = path.join(__dirname, 'content', 'photos');
+    let updated = 0;
+    let errors = [];
+    
+    // Update all specified posts
+    for (const slug of slugs) {
+      try {
+        const postDir = path.join(photosDir, slug);
+        const indexPath = path.join(postDir, 'index.md');
+        
+        let existingContent = '';
+        let isDirectory = false;
+        
+        if (await fs.pathExists(indexPath)) {
+          existingContent = await fs.readFile(indexPath, 'utf-8');
+          isDirectory = true;
+        } else {
+          const filePath = path.join(photosDir, `${slug}.md`);
+          if (await fs.pathExists(filePath)) {
+            existingContent = await fs.readFile(filePath, 'utf-8');
+          } else {
+            errors.push(`Post '${slug}' not found`);
+            continue;
+          }
+        }
+        
+        const { frontmatter, body: existingBody } = parseFrontmatter(existingContent);
+        
+        // Apply updates - only update fields that are provided and not empty
+        if (updates.title !== undefined && updates.title !== '') {
+          frontmatter.title = updates.title.trim();
+        }
+        
+        if (updates.description !== undefined && updates.description !== '') {
+          // Description will be set as body content
+        }
+        
+        if (updates.photoDate !== undefined && updates.photoDate !== '') {
+          frontmatter.photoDate = updates.photoDate.trim();
+        }
+        
+        if (updates.camera !== undefined && updates.camera !== '') {
+          frontmatter.camera = updates.camera.trim();
+        }
+        
+        // Handle location data
+        if (updates.location !== undefined) {
+          try {
+            const locationParsed = typeof updates.location === 'string' 
+              ? JSON.parse(updates.location) 
+              : updates.location;
+            if (locationParsed && locationParsed.name) {
+              frontmatter.location = {
+                name: locationParsed.name,
+                lat: locationParsed.lat,
+                lng: locationParsed.lng
+              };
+            }
+          } catch (parseError) {
+            console.error(`Error parsing location data for ${slug}:`, parseError);
+          }
+        }
+        
+        // Handle frame data
+        if (updates.frame && isDirectory) {
+          try {
+            const frameParsed = typeof updates.frame === 'string' ? JSON.parse(updates.frame) : updates.frame;
+            
+            // Remove old framed image first
+            const oldFramed = await findFramedImage(postDir);
+            if (oldFramed) {
+              await fs.remove(path.join(postDir, oldFramed));
+            }
+            
+            // Only generate frame if type is not 'none'
+            if (frameParsed.type && frameParsed.type !== 'none') {
+              frontmatter.frame = frameParsed;
+              
+              // Generate framed image from original
+              const mainImage = await findImageFile(postDir);
+              if (mainImage) {
+                const mainImagePath = path.join(postDir, mainImage);
+                const framedImagePath = path.join(postDir, 'image-framed.jpg');
+                await generateFramedImage(mainImagePath, framedImagePath, frameParsed);
+              }
+            } else {
+              // Remove frame from frontmatter if type is 'none'
+              delete frontmatter.frame;
+            }
+          } catch (parseError) {
+            console.error(`Error parsing frame data for ${slug}:`, parseError);
+          }
+        }
+        
+        // Generate new content
+        const finalDescription = (updates.description !== undefined && updates.description !== '') 
+          ? updates.description 
+          : existingBody;
+        const newContent = generateFrontmatter(frontmatter, finalDescription || '');
+        
+        // Write back
+        if (isDirectory) {
+          await fs.writeFile(indexPath, newContent);
+        } else {
+          await fs.writeFile(path.join(photosDir, `${slug}.md`), newContent);
+        }
+        
+        updated++;
+      } catch (error) {
+        errors.push(`Failed to update '${slug}': ${error.message}`);
+      }
+    }
+    
+    // Restart Hugo server once after all updates (async)
+    if (updated > 0) {
+      restartHugoServer().catch(error => {
+        console.error('Error restarting Hugo server:', error);
+      });
+    }
+    
+    // Respond with results
+    res.json({ 
+      success: updated > 0, 
+      updated,
+      total: slugs.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Error batch updating posts:', error);
+    res.status(500).json({ error: error.message || 'Failed to update posts' });
+  }
+});
+
+// ========== Album API Endpoints ==========
+
+const albumsDataPath = path.join(__dirname, 'data', 'albums.json');
+const albumsContentPath = path.join(__dirname, 'content', 'albums');
+
+// Valid album layouts
+const ALBUM_LAYOUTS = ['horizontal', 'vertical'];
+
+// Helper function to load albums
+async function loadAlbums() {
+  try {
+    await fs.ensureDir(path.dirname(albumsDataPath));
+    if (await fs.pathExists(albumsDataPath)) {
+      const data = await fs.readFile(albumsDataPath, 'utf-8');
+      return JSON.parse(data);
+    }
+    return { albums: [] };
+  } catch (error) {
+    console.error('Error loading albums:', error);
+    return { albums: [] };
+  }
+}
+
+// Helper function to save albums
+async function saveAlbums(data) {
+  await fs.ensureDir(path.dirname(albumsDataPath));
+  await fs.writeFile(albumsDataPath, JSON.stringify(data, null, 2));
+}
+
+// Generate unique album ID
+function generateAlbumId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+// Create/update album content page for Hugo
+async function syncAlbumContentPage(album) {
+  try {
+    await fs.ensureDir(albumsContentPath);
+    const albumDir = path.join(albumsContentPath, album.id);
+    await fs.ensureDir(albumDir);
+    
+    const frontmatter = {
+      title: album.name,
+      date: album.createdAt || new Date().toISOString(),
+      layout: album.layout || 'horizontal',
+      albumId: album.id,
+      photoSlugs: album.photoSlugs || []
+    };
+    
+    // Add background colors if set
+    if (album.bgColor) {
+      frontmatter.bgColor = album.bgColor;
+    }
+    if (album.bgColorDark) {
+      frontmatter.bgColorDark = album.bgColorDark;
+    }
+    
+    const content = generateFrontmatter(frontmatter, album.description || '');
+    await fs.writeFile(path.join(albumDir, 'index.md'), content);
+    
+    console.log(`Synced album content page: ${album.id}`);
+  } catch (error) {
+    console.error('Error syncing album content page:', error);
+  }
+}
+
+// Delete album content page
+async function deleteAlbumContentPage(albumId) {
+  try {
+    const albumDir = path.join(albumsContentPath, albumId);
+    if (await fs.pathExists(albumDir)) {
+      await fs.remove(albumDir);
+      console.log(`Deleted album content page: ${albumId}`);
+    }
+  } catch (error) {
+    console.error('Error deleting album content page:', error);
+  }
+}
+
+// List all albums
+app.get('/api/albums', async (req, res) => {
+  try {
+    const data = await loadAlbums();
+    res.json(data);
+  } catch (error) {
+    console.error('Error listing albums:', error);
+    res.status(500).json({ error: 'Failed to list albums' });
+  }
+});
+
+// Create new album
+app.post('/api/albums', async (req, res) => {
+  try {
+    const { name, description, photoSlugs, layout, thumbnailSlug, stackedPreview, bgColor, bgColorDark } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Album name is required' });
+    }
+    
+    const data = await loadAlbums();
+    
+    const newAlbum = {
+      id: generateAlbumId(),
+      name: name.trim(),
+      description: (description || '').trim(),
+      photoSlugs: photoSlugs || [],
+      layout: ALBUM_LAYOUTS.includes(layout) ? layout : 'horizontal',
+      thumbnailSlug: thumbnailSlug || null,
+      stackedPreview: stackedPreview !== false, // Default to true
+      bgColor: bgColor || null,
+      bgColorDark: bgColorDark || null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    data.albums.push(newAlbum);
+    await saveAlbums(data);
+    
+    // Create Hugo content page for the album
+    await syncAlbumContentPage(newAlbum);
+    
+    // Restart Hugo to pick up new album page
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, album: newAlbum });
+  } catch (error) {
+    console.error('Error creating album:', error);
+    res.status(500).json({ error: 'Failed to create album' });
+  }
+});
+
+// Get single album
+app.get('/api/albums/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await loadAlbums();
+    const album = data.albums.find(a => a.id === id);
+    
+    if (!album) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    
+    res.json(album);
+  } catch (error) {
+    console.error('Error getting album:', error);
+    res.status(500).json({ error: 'Failed to get album' });
+  }
+});
+
+// Update album
+app.put('/api/albums/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, photoSlugs, layout, thumbnailSlug, stackedPreview, bgColor, bgColorDark } = req.body;
+    
+    const data = await loadAlbums();
+    const albumIndex = data.albums.findIndex(a => a.id === id);
+    
+    if (albumIndex === -1) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    
+    const album = data.albums[albumIndex];
+    
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return res.status(400).json({ error: 'Album name cannot be empty' });
+      }
+      album.name = name.trim();
+    }
+    
+    if (description !== undefined) {
+      album.description = description.trim();
+    }
+    
+    if (photoSlugs !== undefined) {
+      album.photoSlugs = photoSlugs;
+    }
+    
+    if (layout !== undefined && ALBUM_LAYOUTS.includes(layout)) {
+      album.layout = layout;
+    }
+    
+    // Save thumbnail settings
+    if (thumbnailSlug !== undefined) {
+      album.thumbnailSlug = thumbnailSlug;
+    }
+    
+    if (stackedPreview !== undefined) {
+      album.stackedPreview = stackedPreview;
+    }
+    
+    // Save background color settings
+    if (bgColor !== undefined) {
+      album.bgColor = bgColor || null;
+    }
+    
+    if (bgColorDark !== undefined) {
+      album.bgColorDark = bgColorDark || null;
+    }
+    
+    album.updatedAt = new Date().toISOString();
+    
+    await saveAlbums(data);
+    
+    // Update Hugo content page
+    await syncAlbumContentPage(album);
+    
+    // Restart Hugo to pick up changes
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, album });
+  } catch (error) {
+    console.error('Error updating album:', error);
+    res.status(500).json({ error: 'Failed to update album' });
+  }
+});
+
+// Delete album
+app.delete('/api/albums/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await loadAlbums();
+    const albumIndex = data.albums.findIndex(a => a.id === id);
+    
+    if (albumIndex === -1) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    
+    data.albums.splice(albumIndex, 1);
+    await saveAlbums(data);
+    
+    // Delete Hugo content page
+    await deleteAlbumContentPage(id);
+    
+    // Restart Hugo to pick up changes
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, message: 'Album deleted' });
+  } catch (error) {
+    console.error('Error deleting album:', error);
+    res.status(500).json({ error: 'Failed to delete album' });
+  }
+});
+
+// Add photos to album
+app.post('/api/albums/:id/photos', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { photoSlugs } = req.body;
+    
+    if (!Array.isArray(photoSlugs)) {
+      return res.status(400).json({ error: 'photoSlugs must be an array' });
+    }
+    
+    const data = await loadAlbums();
+    const album = data.albums.find(a => a.id === id);
+    
+    if (!album) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    
+    // Add new photos (avoid duplicates)
+    const existingSlugs = new Set(album.photoSlugs);
+    photoSlugs.forEach(slug => existingSlugs.add(slug));
+    album.photoSlugs = Array.from(existingSlugs);
+    album.updatedAt = new Date().toISOString();
+    
+    await saveAlbums(data);
+    
+    // Sync Hugo content page
+    await syncAlbumContentPage(album);
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, album });
+  } catch (error) {
+    console.error('Error adding photos to album:', error);
+    res.status(500).json({ error: 'Failed to add photos to album' });
+  }
+});
+
+// Remove photos from album
+app.delete('/api/albums/:id/photos', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { photoSlugs } = req.body;
+    
+    if (!Array.isArray(photoSlugs)) {
+      return res.status(400).json({ error: 'photoSlugs must be an array' });
+    }
+    
+    const data = await loadAlbums();
+    const album = data.albums.find(a => a.id === id);
+    
+    if (!album) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    
+    // Remove specified photos
+    const slugsToRemove = new Set(photoSlugs);
+    album.photoSlugs = album.photoSlugs.filter(slug => !slugsToRemove.has(slug));
+    album.updatedAt = new Date().toISOString();
+    
+    await saveAlbums(data);
+    
+    // Sync Hugo content page
+    await syncAlbumContentPage(album);
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, album });
+  } catch (error) {
+    console.error('Error removing photos from album:', error);
+    res.status(500).json({ error: 'Failed to remove photos from album' });
+  }
+});
+
+// ========== Gallery Order API Endpoints ==========
+
+const galleryOrderPath = path.join(__dirname, 'data', 'galleryOrder.json');
+
+// Get gallery order
+app.get('/api/gallery-order', async (req, res) => {
+  try {
+    await fs.ensureDir(path.dirname(galleryOrderPath));
+    if (await fs.pathExists(galleryOrderPath)) {
+      const data = await fs.readFile(galleryOrderPath, 'utf-8');
+      res.json(JSON.parse(data));
+    } else {
+      res.json({ order: [] });
+    }
+  } catch (error) {
+    console.error('Error loading gallery order:', error);
+    res.status(500).json({ error: 'Failed to load gallery order' });
+  }
+});
+
+// Save gallery order
+app.put('/api/gallery-order', async (req, res) => {
+  try {
+    const { order } = req.body;
+    
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ error: 'Order must be an array of slugs' });
+    }
+    
+    await fs.ensureDir(path.dirname(galleryOrderPath));
+    await fs.writeFile(galleryOrderPath, JSON.stringify({ order }, null, 2));
+    
+    console.log(`Saved gallery order: ${order.length} photos`);
+    
+    // Restart Hugo to pick up the new order
+    debouncedHugoRestart();
+    
+    res.json({ success: true, message: 'Gallery order saved' });
+  } catch (error) {
+    console.error('Error saving gallery order:', error);
+    res.status(500).json({ error: 'Failed to save gallery order' });
   }
 });
 

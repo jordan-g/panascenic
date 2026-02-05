@@ -2,17 +2,38 @@
 <div class="container">
     <article class="photo-single">
         <div class="photo-wrapper">
-            {{ $image := .Resources.GetMatch "image.*" }}
-            {{ if not $image }}
-                {{ $image = .Resources.GetMatch "*image*" }}
+            {{/* Find dark mode image first */}}
+            {{ $darkImage := .Resources.GetMatch "image-dark.*" }}
+            
+            {{/* Find framed image (baked frame) */}}
+            {{ $framedImage := .Resources.GetMatch "image-framed.*" }}
+            
+            {{/* Find main image - exclude dark mode, thumbnail, and framed */}}
+            {{ $image := "" }}
+            {{ range .Resources.ByType "image" }}
+                {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) (not (hasPrefix .Name "image-framed")) }}
+                    {{ $image = . }}
+                {{ end }}
             {{ end }}
-            {{ if not $image }}
-                {{ $image = index (.Resources.ByType "image") 0 }}
-            {{ end }}
-            {{ if $image }}
-                <img src="{{ $image.RelPermalink }}" alt="{{ .Title }}" class="photo-large">
+            
+            {{ $imageSrc := "" }}
+            {{ $darkImageSrc := "" }}
+            
+            {{/* Use framed image if available, otherwise use original */}}
+            {{ if $framedImage }}
+                {{ $imageSrc = $framedImage.RelPermalink }}
+            {{ else if $image }}
+                {{ $imageSrc = $image.RelPermalink }}
             {{ else if .Params.image }}
-                <img src="{{ .Params.image | relURL }}" alt="{{ .Title }}" class="photo-large">
+                {{ $imageSrc = .Params.image | relURL }}
+            {{ end }}
+            
+            {{ if $darkImage }}
+                {{ $darkImageSrc = $darkImage.RelPermalink }}
+            {{ end }}
+            
+            {{ if $imageSrc }}
+                <img src="{{ $imageSrc }}" alt="{{ .Title }}" class="photo-large"{{ if $darkImageSrc }} data-light-src="{{ $imageSrc }}" data-dark-src="{{ $darkImageSrc }}"{{ end }}>
             {{ end }}
         </div>
         
@@ -25,6 +46,39 @@
                 {{ .Content }}
             </div>
             {{ end }}
+            {{ if or .Params.photoDate .Params.camera .Params.location }}
+            <div class="photo-meta">
+                {{ if .Params.photoDate }}
+                <span class="photo-meta-item photo-date">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    {{ dateFormat "January 2, 2006" .Params.photoDate }}
+                </span>
+                {{ end }}
+                {{ if .Params.camera }}
+                <span class="photo-meta-item photo-camera">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    {{ .Params.camera }}
+                </span>
+                {{ end }}
+                {{ if .Params.location }}
+                <a href="https://www.openstreetmap.org/?mlat={{ .Params.location.lat }}&mlon={{ .Params.location.lng }}#map=15/{{ .Params.location.lat }}/{{ .Params.location.lng }}" target="_blank" rel="noopener" class="photo-meta-item photo-location">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    {{ .Params.location.name }}
+                </a>
+                {{ end }}
+            </div>
+            {{ end }}
         </div>
         
         <div class="photo-navigation">
@@ -32,5 +86,41 @@
         </div>
     </article>
 </div>
+
+{{ with .Resources.GetMatch "image-dark.*" }}
+<script>
+// Dark mode image switching for single photo (uses site's data-theme attribute)
+(function() {
+    function isDarkMode() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    
+    function updateDarkModeImage() {
+        const isDark = isDarkMode();
+        const img = document.querySelector('.photo-large[data-dark-src]');
+        if (!img) return;
+        
+        if (isDark) {
+            img.src = img.dataset.darkSrc;
+        } else {
+            img.src = img.dataset.lightSrc;
+        }
+    }
+    
+    // Initial update
+    updateDarkModeImage();
+    
+    // Watch for theme changes via MutationObserver
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'data-theme') {
+                updateDarkModeImage();
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+})();
+</script>
+{{ end }}
 {{ end }}
 

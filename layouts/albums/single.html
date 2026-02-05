@@ -1,0 +1,181 @@
+{{ define "main" }}
+{{ $layout := .Params.layout | default "horizontal" }}
+{{ $photoSlugs := .Params.photoSlugs | default slice }}
+{{ $bgColor := .Params.bgColor }}
+{{ $bgColorDark := .Params.bgColorDark }}
+
+<div class="album-page">
+    <div class="album-header">
+        <a href="{{ .Site.Home.RelPermalink }}" class="back-to-home">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back to Gallery
+        </a>
+        <h1 class="album-title">{{ .Title }}</h1>
+        {{ if .Content }}
+        <p class="album-description">{{ .Content }}</p>
+        {{ end }}
+        <p class="album-photo-count">{{ len $photoSlugs }} photo{{ if ne (len $photoSlugs) 1 }}s{{ end }}</p>
+    </div>
+
+    <div class="album-photos album-layout-{{ $layout }}"{{ if $bgColor }} data-bg-color="{{ $bgColor }}"{{ end }}{{ if $bgColorDark }} data-bg-color-dark="{{ $bgColorDark }}"{{ end }}{{ if $bgColor }} style="background-color: {{ $bgColor }};"{{ end }}>
+        {{ range $photoSlugs }}
+            {{ $slug := . }}
+            {{ range where $.Site.RegularPages "Section" "photos" }}
+                {{ if eq (path.Base .File.Dir) $slug }}
+                    {{ $photo := . }}
+                    
+                    {{/* Find dark mode image */}}
+                    {{ $darkImage := $photo.Resources.GetMatch "image-dark.*" }}
+                    
+                    {{/* Find main image */}}
+                    {{ $image := "" }}
+                    {{ range $photo.Resources.ByType "image" }}
+                        {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) (not (hasPrefix .Name "image-framed")) }}
+                            {{ $image = . }}
+                        {{ end }}
+                    {{ end }}
+                    
+                    {{ if $image }}
+                    <div class="album-photo-item"{{ if $darkImage }} data-dark-src="{{ $darkImage.RelPermalink }}"{{ end }}>
+                        <a href="{{ $photo.RelPermalink }}">
+                            <img src="{{ $image.RelPermalink }}" 
+                                 alt="{{ $photo.Title }}" 
+                                 class="album-photo-img"
+                                 loading="lazy">
+                        </a>
+                        {{ if $photo.Title }}
+                        <p class="album-photo-caption">{{ $photo.Title }}</p>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                {{ end }}
+            {{ end }}
+        {{ end }}
+    </div>
+</div>
+
+<script>
+// Dark mode image switching and background color for album photos
+(function() {
+    function isDarkMode() {
+        const theme = document.documentElement.getAttribute('data-theme');
+        if (theme === 'dark') return true;
+        if (theme === 'light') return false;
+        // Fall back to system preference
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    
+    function updateDarkModeImages() {
+        const isDark = isDarkMode();
+        document.querySelectorAll('.album-photo-item[data-dark-src]').forEach(item => {
+            const img = item.querySelector('.album-photo-img');
+            if (!img) return;
+            
+            if (!img.dataset.lightSrc) {
+                img.dataset.lightSrc = img.src;
+            }
+            
+            const darkSrc = item.dataset.darkSrc;
+            if (isDark && darkSrc) {
+                img.src = darkSrc;
+            } else {
+                img.src = img.dataset.lightSrc;
+            }
+        });
+    }
+    
+    function updateAlbumBackground() {
+        const isDark = isDarkMode();
+        const albumPhotos = document.querySelector('.album-photos[data-bg-color]');
+        if (!albumPhotos) return;
+        
+        const lightBg = albumPhotos.dataset.bgColor;
+        const darkBg = albumPhotos.dataset.bgColorDark || lightBg;
+        
+        if (isDark && darkBg) {
+            albumPhotos.style.backgroundColor = darkBg;
+        } else if (lightBg) {
+            albumPhotos.style.backgroundColor = lightBg;
+        }
+    }
+    
+    // Handle horizontal layout: center if content fits, left-align if scrolling needed
+    function handleHorizontalLayout() {
+        const horizontalLayout = document.querySelector('.album-layout-horizontal');
+        if (horizontalLayout) {
+            // Check if content overflows (needs horizontal scrolling)
+            if (horizontalLayout.scrollWidth > horizontalLayout.clientWidth) {
+                horizontalLayout.classList.add('has-overflow');
+            } else {
+                horizontalLayout.classList.remove('has-overflow');
+            }
+            // Always start scrolled to the left
+            horizontalLayout.scrollLeft = 0;
+        }
+    }
+    
+    // Wait for all images to load before checking overflow
+    function initHorizontalLayout() {
+        const horizontalLayout = document.querySelector('.album-layout-horizontal');
+        if (!horizontalLayout) return;
+        
+        const images = horizontalLayout.querySelectorAll('img');
+        let loadedCount = 0;
+        const totalImages = images.length;
+        
+        if (totalImages === 0) {
+            handleHorizontalLayout();
+            return;
+        }
+        
+        function onImageLoad() {
+            loadedCount++;
+            if (loadedCount >= totalImages) {
+                handleHorizontalLayout();
+            }
+        }
+        
+        images.forEach(img => {
+            if (img.complete) {
+                onImageLoad();
+            } else {
+                img.addEventListener('load', onImageLoad);
+                img.addEventListener('error', onImageLoad);
+            }
+        });
+        
+        // Fallback: run after a short delay in case load events don't fire
+        setTimeout(handleHorizontalLayout, 500);
+    }
+    
+    updateDarkModeImages();
+    updateAlbumBackground();
+    initHorizontalLayout();
+    
+    // Re-check on window resize in case viewport changes
+    window.addEventListener('resize', handleHorizontalLayout);
+    
+    // Listen for manual theme changes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'data-theme') {
+                updateDarkModeImages();
+                updateAlbumBackground();
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+    
+    // Listen for system preference changes
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            updateDarkModeImages();
+            updateAlbumBackground();
+        });
+    }
+})();
+</script>
+{{ end }}

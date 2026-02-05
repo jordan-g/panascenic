@@ -19,6 +19,16 @@ const descriptionInput = document.getElementById('descriptionInput');
 const tagsInput = document.getElementById('tagsInput');
 const draftInput = document.getElementById('draftInput');
 const draftGroup = document.getElementById('draftGroup');
+const photoDateInput = document.getElementById('photoDateInput');
+const photoDateGroup = document.getElementById('photoDateGroup');
+const cameraInput = document.getElementById('cameraInput');
+const cameraGroup = document.getElementById('cameraGroup');
+const locationGroup = document.getElementById('locationGroup');
+const locationSearch = document.getElementById('locationSearch');
+const locationResults = document.getElementById('locationResults');
+const selectedLocation = document.getElementById('selectedLocation');
+const selectedLocationName = document.getElementById('selectedLocationName');
+const clearLocationBtn = document.getElementById('clearLocationBtn');
 const previewContainer = document.getElementById('previewContainer');
 const previewGrid = document.getElementById('previewGrid');
 const currentImageContainer = document.getElementById('currentImageContainer');
@@ -51,11 +61,49 @@ const darkModePreview = document.getElementById('darkModePreview');
 const darkModeImage = document.getElementById('darkModeImage');
 const removeDarkModeBtn = document.getElementById('removeDarkModeBtn');
 
+// Frame elements
+const frameSection = document.getElementById('frameSection');
+const framePreview = document.getElementById('framePreview');
+const framePreviewImage = document.getElementById('framePreviewImage');
+const frameTypeOptions = document.getElementById('frameTypeOptions');
+const insetWidthGroup = document.getElementById('insetWidthGroup');
+const insetWidthSlider = document.getElementById('insetWidthSlider');
+const insetWidthValue = document.getElementById('insetWidthValue');
+const frameColorGroup = document.getElementById('frameColorGroup');
+const frameColorOptions = document.getElementById('frameColorOptions');
+
 // State
 let currentEditingSlug = null;
 let isEditMode = false;
 let isSelectMode = false;
 let selectedPosts = new Set();
+let currentPosts = []; // Store loaded posts for sorting
+let filteredPosts = []; // Posts after filtering
+let currentSort = { field: 'date', order: 'desc' };
+let galleryOrder = []; // Order for the published gallery
+let isGalleryOrderMode = false; // Whether we're editing gallery order
+let currentLocation = null; // Current selected location { name, lat, lng }
+let locationSearchTimeout = null; // Debounce timer for location search
+
+// Filter state
+let currentFilters = {
+    search: '',
+    album: '',
+    dateFrom: null,
+    dateTo: null
+};
+let allAlbums = []; // Cache for album list
+
+// Filter elements
+const searchInput = document.getElementById('searchInput');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
+const albumFilter = document.getElementById('albumFilter');
+const dateFromInput = document.getElementById('dateFrom');
+const dateToInput = document.getElementById('dateTo');
+const clearDateBtn = document.getElementById('clearDateBtn');
+const filterResults = document.getElementById('filterResults');
+const filterResultsCount = document.getElementById('filterResultsCount');
+const filterResultsTotal = document.getElementById('filterResultsTotal');
 
 // Crop state
 let cropData = {
@@ -69,6 +117,13 @@ let cropData = {
     startCropW: 0, startCropH: 0
 };
 const ASPECT_RATIO = 4 / 5; // 600x750 thumbnail
+
+// Frame state
+let frameData = {
+    type: 'none',      // 'none', 'even', '1:1', '4:5', '5:4', '9:16', '2:1'
+    insetWidth: 10,    // 0-100 percentage
+    color: '#FFFFFF'   // hex color
+};
 
 // Initialize
 loadPosts();
@@ -219,7 +274,15 @@ async function loadPosts() {
             return;
         }
         
-        renderPosts(data.posts);
+        currentPosts = data.posts;
+        
+        // Load albums for filter dropdown (only once or if not loaded)
+        if (allAlbums.length === 0) {
+            await loadAlbumsForFilter();
+        }
+        
+        // Apply filters and render
+        applyFiltersAndRender();
         
     } catch (error) {
         console.error('Error loading posts:', error);
@@ -227,43 +290,742 @@ async function loadPosts() {
     }
 }
 
+// Load albums for the filter dropdown
+async function loadAlbumsForFilter() {
+    try {
+        const response = await fetch('/api/albums');
+        const data = await response.json();
+        
+        if (response.ok && data.albums) {
+            allAlbums = data.albums;
+            populateAlbumFilter();
+        }
+    } catch (error) {
+        console.error('Error loading albums for filter:', error);
+    }
+}
+
+// Populate the album filter dropdown
+function populateAlbumFilter() {
+    if (!albumFilter) return;
+    
+    // Keep the "All Albums" option
+    albumFilter.innerHTML = '<option value="">All Albums</option>';
+    
+    // Add "No Album" option
+    albumFilter.innerHTML += '<option value="__none__">No Album</option>';
+    
+    // Add each album
+    allAlbums.forEach(album => {
+        const option = document.createElement('option');
+        option.value = album.id;
+        option.textContent = album.name;
+        albumFilter.appendChild(option);
+    });
+}
+
+// Filter posts based on current filters
+function filterPosts(posts) {
+    return posts.filter(post => {
+        // Search filter (title and description)
+        if (currentFilters.search) {
+            const searchLower = currentFilters.search.toLowerCase();
+            const titleMatch = (post.title || '').toLowerCase().includes(searchLower);
+            const descMatch = (post.description || '').toLowerCase().includes(searchLower);
+            if (!titleMatch && !descMatch) {
+                return false;
+            }
+        }
+        
+        // Album filter
+        if (currentFilters.album) {
+            if (currentFilters.album === '__none__') {
+                // Check if post is NOT in any album
+                const inAnyAlbum = allAlbums.some(album => 
+                    album.photoSlugs && album.photoSlugs.includes(post.slug)
+                );
+                if (inAnyAlbum) {
+                    return false;
+                }
+            } else {
+                // Check if post is in the selected album
+                const album = allAlbums.find(a => a.id === currentFilters.album);
+                if (!album || !album.photoSlugs || !album.photoSlugs.includes(post.slug)) {
+                    return false;
+                }
+            }
+        }
+        
+        // Date range filter
+        if (currentFilters.dateFrom || currentFilters.dateTo) {
+            const postDate = post.date ? new Date(post.date) : null;
+            if (!postDate) {
+                return false; // No date means it doesn't match date filter
+            }
+            
+            if (currentFilters.dateFrom) {
+                const fromDate = new Date(currentFilters.dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                if (postDate < fromDate) {
+                    return false;
+                }
+            }
+            
+            if (currentFilters.dateTo) {
+                const toDate = new Date(currentFilters.dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                if (postDate > toDate) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    });
+}
+
+// Apply filters and render
+function applyFiltersAndRender() {
+    filteredPosts = filterPosts(currentPosts);
+    const sorted = sortPosts(filteredPosts);
+    renderPosts(sorted);
+    updateFilterResultsDisplay();
+}
+
+// Update the filter results count display
+function updateFilterResultsDisplay() {
+    const hasActiveFilters = currentFilters.search || 
+                              currentFilters.album || 
+                              currentFilters.dateFrom || 
+                              currentFilters.dateTo;
+    
+    if (hasActiveFilters && filterResults) {
+        filterResults.style.display = 'block';
+        filterResultsCount.textContent = filteredPosts.length;
+        filterResultsTotal.textContent = currentPosts.length;
+    } else if (filterResults) {
+        filterResults.style.display = 'none';
+    }
+}
+
+// Filter event listeners
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        currentFilters.search = e.target.value.trim();
+        clearSearchBtn.style.display = currentFilters.search ? 'flex' : 'none';
+        applyFiltersAndRender();
+    });
+}
+
+if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        currentFilters.search = '';
+        clearSearchBtn.style.display = 'none';
+        applyFiltersAndRender();
+    });
+}
+
+if (albumFilter) {
+    albumFilter.addEventListener('change', (e) => {
+        currentFilters.album = e.target.value;
+        applyFiltersAndRender();
+    });
+}
+
+if (dateFromInput) {
+    dateFromInput.addEventListener('change', (e) => {
+        currentFilters.dateFrom = e.target.value || null;
+        updateClearDateBtnVisibility();
+        applyFiltersAndRender();
+    });
+}
+
+if (dateToInput) {
+    dateToInput.addEventListener('change', (e) => {
+        currentFilters.dateTo = e.target.value || null;
+        updateClearDateBtnVisibility();
+        applyFiltersAndRender();
+    });
+}
+
+if (clearDateBtn) {
+    clearDateBtn.addEventListener('click', () => {
+        dateFromInput.value = '';
+        dateToInput.value = '';
+        currentFilters.dateFrom = null;
+        currentFilters.dateTo = null;
+        clearDateBtn.style.display = 'none';
+        applyFiltersAndRender();
+    });
+}
+
+function updateClearDateBtnVisibility() {
+    if (clearDateBtn) {
+        clearDateBtn.style.display = (currentFilters.dateFrom || currentFilters.dateTo) ? 'flex' : 'none';
+    }
+}
+
+// Sort posts based on current sort settings (for admin view)
+function sortPosts(posts) {
+    const sorted = [...posts];
+    
+    // In gallery order mode or sorting by gallery order
+    if (isGalleryOrderMode || currentSort.field === 'gallery') {
+        const orderMap = {};
+        galleryOrder.forEach((slug, index) => {
+            orderMap[slug] = index;
+        });
+        
+        sorted.sort((a, b) => {
+            const orderA = orderMap[a.slug] !== undefined ? orderMap[a.slug] : 9999;
+            const orderB = orderMap[b.slug] !== undefined ? orderMap[b.slug] : 9999;
+            return orderA - orderB;
+        });
+        
+        return sorted;
+    }
+    
+    // Normal admin sorting (date or title)
+    sorted.sort((a, b) => {
+        let valA, valB;
+        
+        if (currentSort.field === 'date') {
+            valA = new Date(a.date || 0).getTime();
+            valB = new Date(b.date || 0).getTime();
+        } else if (currentSort.field === 'title') {
+            valA = (a.title || '').toLowerCase();
+            valB = (b.title || '').toLowerCase();
+        }
+        
+        if (currentSort.order === 'asc') {
+            return valA > valB ? 1 : valA < valB ? -1 : 0;
+        } else {
+            return valA < valB ? 1 : valA > valB ? -1 : 0;
+        }
+    });
+    return sorted;
+}
+
+// Load gallery order from server
+async function loadGalleryOrder() {
+    try {
+        const response = await fetch('/api/gallery-order');
+        if (response.ok) {
+            const data = await response.json();
+            galleryOrder = data.order || [];
+        } else {
+            // Fallback to localStorage
+            const saved = localStorage.getItem('galleryOrder');
+            if (saved) {
+                galleryOrder = JSON.parse(saved);
+            }
+        }
+    } catch (e) {
+        // Fallback to localStorage
+        try {
+            const saved = localStorage.getItem('galleryOrder');
+            if (saved) {
+                galleryOrder = JSON.parse(saved);
+            }
+        } catch (e2) {
+            console.error('Error loading gallery order:', e2);
+            galleryOrder = [];
+        }
+    }
+}
+
+// Save gallery order to server (and localStorage as backup)
+async function saveGalleryOrder() {
+    // Save to localStorage as backup
+    try {
+        localStorage.setItem('galleryOrder', JSON.stringify(galleryOrder));
+    } catch (e) {
+        console.error('Error saving gallery order to localStorage:', e);
+    }
+    
+    // Try to save to server
+    try {
+        const response = await fetch('/api/gallery-order', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: galleryOrder })
+        });
+        
+        if (!response.ok) {
+            console.warn('Could not save gallery order to server, saved locally');
+        }
+    } catch (e) {
+        console.warn('Could not save gallery order to server, saved locally:', e);
+    }
+}
+
+// Toggle sort menu visibility
+function toggleSortMenu() {
+    const menu = document.getElementById('sortMenu');
+    menu.classList.toggle('open');
+}
+
+// Set sort and re-render (admin view only)
+async function setSort(field, order) {
+    // Exit gallery order mode if active
+    if (isGalleryOrderMode) {
+        exitGalleryOrderMode();
+    }
+    
+    currentSort = { field, order };
+    
+    // Load gallery order if sorting by gallery and not loaded yet
+    if (field === 'gallery' && galleryOrder.length === 0) {
+        await loadGalleryOrder();
+        // Initialize with current posts if still empty (sort by date for default order)
+        if (galleryOrder.length === 0 && currentPosts.length > 0) {
+            const sorted = [...currentPosts].sort((a, b) => {
+                const dateA = new Date(a.date || 0).getTime();
+                const dateB = new Date(b.date || 0).getTime();
+                return dateB - dateA; // newest first
+            });
+            galleryOrder = sorted.map(p => p.slug);
+        }
+    }
+    
+    // Update active state in menu
+    document.querySelectorAll('.sort-menu-item').forEach(item => {
+        const isActive = item.dataset.sort === field && item.dataset.order === order;
+        item.classList.toggle('active', isActive);
+    });
+    
+    // Close menu
+    document.getElementById('sortMenu').classList.remove('open');
+    
+    // Re-render with new sort (respecting filters)
+    applyFiltersAndRender();
+}
+
+// ========== Gallery Order Mode ==========
+
+const galleryOrderBtn = document.getElementById('galleryOrderBtn');
+const exitGalleryOrderBtn = document.getElementById('exitGalleryOrderBtn');
+const galleryOrderHint = document.getElementById('galleryOrderHint');
+
+// Enter gallery order editing mode
+async function enterGalleryOrderMode() {
+    // Load gallery order if not loaded
+    if (galleryOrder.length === 0) {
+        await loadGalleryOrder();
+    }
+    
+    // Initialize gallery order with all current posts if empty
+    if (galleryOrder.length === 0 && currentPosts.length > 0) {
+        // Default to current sort order
+        galleryOrder = sortPosts(currentPosts).map(p => p.slug);
+    }
+    
+    // Add any new posts that aren't in the gallery order
+    currentPosts.forEach(post => {
+        if (!galleryOrder.includes(post.slug)) {
+            galleryOrder.push(post.slug);
+        }
+    });
+    
+    // Remove posts from gallery order that no longer exist
+    const currentSlugs = new Set(currentPosts.map(p => p.slug));
+    galleryOrder = galleryOrder.filter(slug => currentSlugs.has(slug));
+    
+    isGalleryOrderMode = true;
+    
+    // Update UI
+    if (galleryOrderBtn) galleryOrderBtn.classList.add('active');
+    if (galleryOrderHint) galleryOrderHint.style.display = 'flex';
+    if (postsList) postsList.classList.add('reorder-mode', 'gallery-order-mode');
+    
+    // Hide normal controls
+    const sortDropdown = document.getElementById('sortDropdown');
+    const filtersRow = document.getElementById('filtersRow');
+    if (sortDropdown) sortDropdown.style.display = 'none';
+    if (filtersRow) filtersRow.style.display = 'none';
+    if (selectModeBtn) selectModeBtn.style.display = 'none';
+    
+    // Re-render ALL posts in gallery order (ignoring filters)
+    renderPosts(sortPosts(currentPosts));
+}
+
+// Exit gallery order editing mode
+function exitGalleryOrderMode() {
+    isGalleryOrderMode = false;
+    
+    // Update UI
+    if (galleryOrderBtn) galleryOrderBtn.classList.remove('active');
+    if (galleryOrderHint) galleryOrderHint.style.display = 'none';
+    if (postsList) postsList.classList.remove('reorder-mode', 'gallery-order-mode');
+    
+    // Restore normal controls
+    const sortDropdown = document.getElementById('sortDropdown');
+    const filtersRow = document.getElementById('filtersRow');
+    if (sortDropdown) sortDropdown.style.display = 'inline-block';
+    if (filtersRow) filtersRow.style.display = 'flex';
+    if (selectModeBtn) selectModeBtn.style.display = 'inline-flex';
+    
+    // Re-render in normal sort order (respecting filters)
+    applyFiltersAndRender();
+}
+
+// Toggle gallery order mode
+function toggleGalleryOrderMode() {
+    if (isGalleryOrderMode) {
+        exitGalleryOrderMode();
+    } else {
+        enterGalleryOrderMode();
+    }
+}
+
+// Event listeners for gallery order
+if (galleryOrderBtn) {
+    galleryOrderBtn.addEventListener('click', toggleGalleryOrderMode);
+}
+
+if (exitGalleryOrderBtn) {
+    exitGalleryOrderBtn.addEventListener('click', exitGalleryOrderMode);
+}
+
+// Close sort menu when clicking outside
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('sortDropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+        document.getElementById('sortMenu').classList.remove('open');
+    }
+});
+
+// Make sort functions available globally
+window.toggleSortMenu = toggleSortMenu;
+window.setSort = setSort;
+
 // Render posts with selection mode support
 function renderPosts(posts) {
-    postsList.innerHTML = posts.map(post => `
-        <div class="post-card ${isSelectMode ? 'selectable' : ''} ${selectedPosts.has(post.slug) ? 'selected' : ''}" data-slug="${post.slug}">
+    postsList.innerHTML = posts.map((post, index) => `
+        <div class="post-card ${isSelectMode ? 'selectable' : ''} ${selectedPosts.has(post.slug) ? 'selected' : ''} ${isGalleryOrderMode ? 'reorderable' : ''}" 
+             data-slug="${post.slug}" 
+             data-index="${index}"
+             ${isGalleryOrderMode && !isSelectMode ? 'draggable="true"' : ''}>
+            ${isGalleryOrderMode && !isSelectMode ? `
+                <div class="post-drag-handle" title="Drag to reorder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="5" r="1.5"></circle>
+                        <circle cx="9" cy="12" r="1.5"></circle>
+                        <circle cx="9" cy="19" r="1.5"></circle>
+                        <circle cx="15" cy="5" r="1.5"></circle>
+                        <circle cx="15" cy="12" r="1.5"></circle>
+                        <circle cx="15" cy="19" r="1.5"></circle>
+                    </svg>
+                </div>
+                <div class="post-order-badge">${index + 1}</div>
+            ` : ''}
             ${isSelectMode ? `
                 <div class="post-checkbox">
                     <input type="checkbox" ${selectedPosts.has(post.slug) ? 'checked' : ''} onchange="togglePostSelection('${post.slug}', this.checked)">
                 </div>
             ` : ''}
-            <div class="post-image" onclick="${isSelectMode ? `togglePostSelection('${post.slug}')` : `editPost('${post.slug}')`}">
+            <div class="post-image" onclick="${isSelectMode ? `togglePostSelection('${post.slug}')` : (isGalleryOrderMode ? '' : `editPost('${post.slug}')`)}">
                 ${post.image ? `<img src="${post.image}" alt="${post.title || 'Untitled'}" onerror="this.style.display='none'">` : '<div class="no-image">No Image</div>'}
             </div>
-            <div class="post-content" onclick="${isSelectMode ? `togglePostSelection('${post.slug}')` : `editPost('${post.slug}')`}">
-                <h3 class="post-title">${escapeHtml(post.title || 'Untitled')}</h3>
-                <p class="post-description">${escapeHtml(post.description || 'No description')}</p>
+            <div class="post-content ${isSelectMode || isGalleryOrderMode ? '' : 'editable'}" ${isSelectMode ? `onclick="togglePostSelection('${post.slug}')"` : ''}>
+                ${isSelectMode || isGalleryOrderMode ? `
+                    <h3 class="post-title">${escapeHtml(post.title || 'Untitled')}</h3>
+                    <p class="post-description">${escapeHtml(post.description || 'No description')}</p>
+                ` : `
+                    <input type="text" 
+                           class="inline-edit-title" 
+                           value="${escapeHtml(post.title || '')}" 
+                           placeholder="Untitled"
+                           data-slug="${post.slug}"
+                           data-field="title"
+                           oninput="debouncedSaveInlineField(this)"
+                           onblur="saveInlineField(this)"
+                           onkeydown="handleInlineKeydown(event, this)">
+                    <input type="text" 
+                           class="inline-edit-description" 
+                           value="${escapeHtml(post.description || '')}" 
+                           placeholder="No description"
+                           data-slug="${post.slug}"
+                           data-field="description"
+                           oninput="debouncedSaveInlineField(this)"
+                           onblur="saveInlineField(this)"
+                           onkeydown="handleInlineKeydown(event, this)">
+                `}
                 <div class="post-meta">
                     <span class="post-date">${formatDate(post.date)}</span>
                     ${post.draft ? '<span class="draft-badge">Draft</span>' : ''}
                 </div>
             </div>
-            ${!isSelectMode ? `
+            ${!isSelectMode && !isGalleryOrderMode ? `
                 <div class="post-actions">
-                    <button class="btn btn-sm btn-edit" onclick="editPost('${post.slug}')">
+                    <button class="btn btn-sm btn-edit" onclick="editPost('${post.slug}')" title="Full edit">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
-                        Edit
+                    </button>
+                    <button class="btn btn-sm btn-delete-inline" onclick="deletePostInline('${post.slug}')" title="Delete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
                     </button>
                 </div>
             ` : ''}
         </div>
     `).join('');
+    
+    // Initialize drag-and-drop if in gallery order mode
+    if (isGalleryOrderMode && !isSelectMode) {
+        initPostDragDrop();
+    }
 }
+
+// ========== Photo Drag and Drop Reordering ==========
+
+let draggedPostItem = null;
+let draggedPostIndex = null;
+
+function initPostDragDrop() {
+    const items = postsList.querySelectorAll('.post-card.reorderable');
+    
+    items.forEach(item => {
+        item.addEventListener('dragstart', handlePostDragStart);
+        item.addEventListener('dragend', handlePostDragEnd);
+        item.addEventListener('dragover', handlePostDragOver);
+        item.addEventListener('dragenter', handlePostDragEnter);
+        item.addEventListener('dragleave', handlePostDragLeave);
+        item.addEventListener('drop', handlePostDrop);
+    });
+}
+
+function handlePostDragStart(e) {
+    draggedPostItem = this;
+    draggedPostIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.slug);
+    
+    // Add a slight delay to allow the dragging class to take effect
+    setTimeout(() => {
+        this.style.opacity = '0.5';
+    }, 0);
+}
+
+function handlePostDragEnd(e) {
+    this.classList.remove('dragging');
+    this.style.opacity = '';
+    draggedPostItem = null;
+    draggedPostIndex = null;
+    
+    // Remove all drag-over classes
+    postsList.querySelectorAll('.post-card').forEach(item => {
+        item.classList.remove('drag-over', 'drag-over-left', 'drag-over-right');
+    });
+}
+
+function handlePostDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handlePostDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedPostItem) {
+        const thisIndex = parseInt(this.dataset.index);
+        // Show indicator on which side the item will be inserted
+        this.classList.remove('drag-over-left', 'drag-over-right');
+        if (thisIndex < draggedPostIndex) {
+            this.classList.add('drag-over-left');
+        } else {
+            this.classList.add('drag-over-right');
+        }
+    }
+}
+
+function handlePostDragLeave(e) {
+    this.classList.remove('drag-over', 'drag-over-left', 'drag-over-right');
+}
+
+function handlePostDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (this !== draggedPostItem) {
+        const fromIndex = draggedPostIndex;
+        const toIndex = parseInt(this.dataset.index);
+        
+        // Remove from old position and insert at new position
+        const [movedSlug] = galleryOrder.splice(fromIndex, 1);
+        galleryOrder.splice(toIndex, 0, movedSlug);
+        
+        // Save gallery order
+        saveGalleryOrder();
+        
+        // Re-render
+        renderPosts(sortPosts(currentPosts));
+        
+        // Show feedback
+        showListMessage('Gallery order updated', 'success');
+    }
+    
+    return false;
+}
+
+// Inline editing functions
+let inlineEditPending = {};
+let inlineEditTimers = {};  // Debounce timers for each field
+let inlineEditControllers = {};  // AbortControllers for pending requests
+
+async function saveInlineField(input) {
+    const slug = input.dataset.slug;
+    const field = input.dataset.field;
+    const value = input.value.trim();
+    const key = `${slug}-${field}`;
+    
+    // Clear any pending debounce timer
+    if (inlineEditTimers[key]) {
+        clearTimeout(inlineEditTimers[key]);
+        delete inlineEditTimers[key];
+    }
+    
+    // Check if value actually changed (avoid unnecessary saves)
+    if (inlineEditPending[key] === value) return;
+    inlineEditPending[key] = value;
+    
+    // Cancel any in-flight request for this field
+    if (inlineEditControllers[key]) {
+        inlineEditControllers[key].abort();
+    }
+    
+    // Add saving indicator
+    input.classList.add('saving');
+    
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    inlineEditControllers[key] = controller;
+    
+    try {
+        const formData = new FormData();
+        formData.append(field, value);
+        
+        const response = await fetch(`/api/posts/${slug}`, {
+            method: 'PUT',
+            body: formData,
+            signal: controller.signal
+        });
+        
+        // Clean up controller
+        delete inlineEditControllers[key];
+        
+        if (response.ok) {
+            input.classList.remove('saving');
+            input.classList.add('saved');
+            setTimeout(() => input.classList.remove('saved'), 1000);
+        } else {
+            input.classList.remove('saving');
+            input.classList.add('error');
+            setTimeout(() => input.classList.remove('error'), 2000);
+        }
+    } catch (error) {
+        // Clean up controller
+        delete inlineEditControllers[key];
+        
+        // Ignore abort errors (expected when cancelling)
+        if (error.name === 'AbortError') {
+            input.classList.remove('saving');
+            return;
+        }
+        
+        console.error('Error saving inline edit:', error);
+        input.classList.remove('saving');
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 2000);
+    }
+}
+
+// Debounced save - called on input to auto-save while typing
+function debouncedSaveInlineField(input) {
+    const slug = input.dataset.slug;
+    const field = input.dataset.field;
+    const key = `${slug}-${field}`;
+    
+    // Clear existing timer
+    if (inlineEditTimers[key]) {
+        clearTimeout(inlineEditTimers[key]);
+    }
+    
+    // Set new timer - save after 500ms of no typing
+    inlineEditTimers[key] = setTimeout(() => {
+        saveInlineField(input);
+        delete inlineEditTimers[key];
+    }, 500);
+}
+
+function handleInlineKeydown(event, input) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        input.blur();
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        // Reload to reset value
+        loadPosts();
+    }
+}
+
+async function deletePostInline(slug) {
+    if (!confirm('Delete this photo? This cannot be undone.')) {
+        return;
+    }
+    
+    // Optimistic UI - fade out the card
+    const card = document.querySelector(`.post-card[data-slug="${slug}"]`);
+    if (card) {
+        card.classList.add('deleting');
+    }
+    
+    try {
+        const response = await fetch(`/api/posts/${slug}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Remove card after animation
+            setTimeout(() => {
+                if (card) card.remove();
+                // Check if list is empty
+                if (postsList.querySelectorAll('.post-card').length === 0) {
+                    postsList.innerHTML = '<div class="empty-state">No posts yet. Click "Add Photos" to get started!</div>';
+                }
+            }, 300);
+            showListMessage('Photo deleted.', 'success');
+        } else {
+            // Restore card on error
+            if (card) card.classList.remove('deleting');
+            const data = await response.json();
+            showListMessage(data.error || 'Failed to delete photo', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting post:', error);
+        if (card) card.classList.remove('deleting');
+        showListMessage('Network error. Please try again.', 'error');
+    }
+}
+
+// Make inline functions available globally
+window.saveInlineField = saveInlineField;
+window.debouncedSaveInlineField = debouncedSaveInlineField;
+window.handleInlineKeydown = handleInlineKeydown;
+window.deletePostInline = deletePostInline;
 
 // Selection mode functions
 function enterSelectMode() {
+    // Exit gallery order mode if active
+    if (isGalleryOrderMode) {
+        exitGalleryOrderMode();
+    }
+    
     isSelectMode = true;
     selectedPosts.clear();
     updateSelectedCount();
@@ -271,6 +1033,11 @@ function enterSelectMode() {
     addPostBtn.style.display = 'none';
     deleteSelectedBtn.style.display = 'inline-flex';
     cancelSelectBtn.style.display = 'inline-flex';
+    if (addToAlbumBtn) addToAlbumBtn.style.display = 'none'; // Will show when photos selected
+    if (galleryOrderBtn) galleryOrderBtn.style.display = 'none';
+    const bulkEditBtnEl = document.getElementById('bulkEditBtn');
+    if (bulkEditBtnEl) bulkEditBtnEl.style.display = 'none'; // Will show when photos selected
+    
     loadPosts();
 }
 
@@ -281,6 +1048,11 @@ function exitSelectMode() {
     addPostBtn.style.display = 'inline-flex';
     deleteSelectedBtn.style.display = 'none';
     cancelSelectBtn.style.display = 'none';
+    if (addToAlbumBtn) addToAlbumBtn.style.display = 'none';
+    if (galleryOrderBtn) galleryOrderBtn.style.display = 'inline-flex';
+    const bulkEditBtnEl = document.getElementById('bulkEditBtn');
+    if (bulkEditBtnEl) bulkEditBtnEl.style.display = 'none';
+    
     loadPosts();
 }
 
@@ -359,6 +1131,11 @@ async function deleteSelectedPosts() {
 
 // Show form view for adding new post
 function showFormView() {
+    // Exit gallery order mode if active
+    if (isGalleryOrderMode) {
+        exitGalleryOrderMode();
+    }
+    
     isEditMode = false;
     currentEditingSlug = null;
     formTitle.textContent = 'Add Photos';
@@ -377,13 +1154,15 @@ function showFormView() {
     uploadProgress.style.display = 'none';
     message.style.display = 'none';
     
-    // Hide crop and dark mode sections for new posts
+    // Hide crop, dark mode, and frame sections for new posts
     cropSection.style.display = 'none';
     darkModeSection.style.display = 'none';
     darkModeInput.value = '';
     darkModeFileText.textContent = 'Choose dark mode image';
     darkModePreview.style.display = 'none';
     removeDarkModeFlag = false;
+    frameSection.style.display = 'none';
+    resetFrameData();
     
     managementView.style.display = 'none';
     formView.style.display = 'block';
@@ -430,6 +1209,22 @@ async function editPost(slug) {
         tagsInput.value = (data.tags || []).join(', ');
         draftInput.checked = data.draft || false;
         
+        // Show and populate photo date, camera, and location fields
+        photoDateGroup.style.display = 'block';
+        cameraGroup.style.display = 'block';
+        locationGroup.style.display = 'block';
+        photoDateInput.value = data.photoDate || '';
+        cameraInput.value = data.camera || '';
+        
+        // Populate location if exists
+        if (data.location && data.location.name) {
+            currentLocation = data.location;
+            selectedLocationName.textContent = data.location.name;
+            selectedLocation.style.display = 'flex';
+        } else {
+            clearLocation();
+        }
+        
         // Show current image if available
         if (data.image) {
             currentImage.src = data.image;
@@ -453,6 +1248,14 @@ async function editPost(slug) {
             darkModePreview.style.display = 'none';
         }
         
+        // Show frame section and initialize frame tool
+        if (data.image) {
+            frameSection.style.display = 'block';
+            initFrameTool(data.image, data.frame || null);
+        } else {
+            frameSection.style.display = 'none';
+        }
+        
         managementView.style.display = 'none';
         formView.style.display = 'block';
         
@@ -473,6 +1276,22 @@ function showManagementView() {
     currentImageContainer.style.display = 'none';
     batchInfo.style.display = 'none';
     uploadProgress.style.display = 'none';
+    
+    // Reset crop, dark mode, and frame state
+    cropSection.style.display = 'none';
+    darkModeSection.style.display = 'none';
+    darkModeInput.value = '';
+    darkModeFileText.textContent = 'Choose dark mode image';
+    darkModePreview.style.display = 'none';
+    removeDarkModeFlag = false;
+    frameSection.style.display = 'none';
+    resetFrameData();
+    
+    // Hide photo date, camera, and location fields (only shown in edit mode)
+    photoDateGroup.style.display = 'none';
+    cameraGroup.style.display = 'none';
+    locationGroup.style.display = 'none';
+    clearLocation();
     
     managementView.style.display = 'block';
     formView.style.display = 'none';
@@ -573,6 +1392,9 @@ async function updatePost() {
     formData.append('description', descriptionInput.value.trim());
     formData.append('tags', tagsInput.value.trim());
     formData.append('draft', draftInput.checked);
+    formData.append('photoDate', photoDateInput.value.trim());
+    formData.append('camera', cameraInput.value.trim());
+    formData.append('location', currentLocation ? JSON.stringify(currentLocation) : '');
     
     // Add crop data (normalized coordinates)
     if (cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
@@ -581,6 +1403,15 @@ async function updatePost() {
             y: cropData.y,
             width: cropData.width,
             height: cropData.height
+        }));
+    }
+    
+    // Add frame data
+    if (frameSection.style.display !== 'none') {
+        formData.append('frame', JSON.stringify({
+            type: frameData.type,
+            insetWidth: frameData.insetWidth,
+            color: frameData.color
         }));
     }
     
@@ -933,6 +1764,224 @@ removeDarkModeBtn.addEventListener('click', () => {
     darkModeImage.src = '';
 });
 
+// ========== Location Picker Functions ==========
+
+// Search for locations using OpenStreetMap Nominatim API
+async function searchLocations(query) {
+    if (!query || query.length < 2) {
+        locationResults.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+            {
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'PanascenicPhotoEditor/1.0'
+                }
+            }
+        );
+        
+        if (!response.ok) throw new Error('Search failed');
+        
+        const results = await response.json();
+        
+        if (results.length === 0) {
+            locationResults.innerHTML = '<div class="location-result-item no-results">No locations found</div>';
+            locationResults.style.display = 'block';
+            return;
+        }
+        
+        locationResults.innerHTML = results.map(result => `
+            <div class="location-result-item" data-name="${result.display_name.replace(/"/g, '&quot;')}" data-lat="${result.lat}" data-lng="${result.lon}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span>${result.display_name}</span>
+            </div>
+        `).join('');
+        locationResults.style.display = 'block';
+        
+        // Add click handlers to results
+        locationResults.querySelectorAll('.location-result-item:not(.no-results)').forEach(item => {
+            item.addEventListener('click', () => {
+                selectLocation({
+                    name: item.dataset.name,
+                    lat: parseFloat(item.dataset.lat),
+                    lng: parseFloat(item.dataset.lng)
+                });
+            });
+        });
+    } catch (error) {
+        console.error('Location search error:', error);
+        locationResults.innerHTML = '<div class="location-result-item no-results">Search failed</div>';
+        locationResults.style.display = 'block';
+    }
+}
+
+// Select a location
+function selectLocation(location) {
+    currentLocation = location;
+    selectedLocationName.textContent = location.name;
+    selectedLocation.style.display = 'flex';
+    locationSearch.value = '';
+    locationResults.style.display = 'none';
+}
+
+// Clear selected location
+function clearLocation() {
+    currentLocation = null;
+    selectedLocation.style.display = 'none';
+    selectedLocationName.textContent = '';
+}
+
+// Location search input handler with debounce
+locationSearch.addEventListener('input', (e) => {
+    clearTimeout(locationSearchTimeout);
+    locationSearchTimeout = setTimeout(() => {
+        searchLocations(e.target.value.trim());
+    }, 300);
+});
+
+// Hide results when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.location-picker')) {
+        locationResults.style.display = 'none';
+    }
+});
+
+// Clear location button
+clearLocationBtn.addEventListener('click', clearLocation);
+
+// ========== Frame Tool Functions ==========
+
+function initFrameTool(imageSrc, existingFrame = null) {
+    // Set preview image
+    framePreviewImage.onload = () => {
+        updateFramePreview();
+    };
+    framePreviewImage.src = imageSrc;
+    
+    // Load existing frame data or reset to defaults
+    if (existingFrame && existingFrame.type && existingFrame.type !== 'none') {
+        frameData.type = existingFrame.type;
+        frameData.insetWidth = existingFrame.insetWidth || 10;
+        frameData.color = existingFrame.color || '#FFFFFF';
+    } else {
+        frameData.type = 'none';
+        frameData.insetWidth = 10;
+        frameData.color = '#FFFFFF';
+    }
+    
+    // Update UI to reflect current state
+    updateFrameTypeUI();
+    updateFrameColorUI();
+    updateInsetSliderUI();
+    updateFrameControlVisibility();
+    updateFramePreview();
+}
+
+function updateFrameTypeUI() {
+    frameTypeOptions.querySelectorAll('.frame-type-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.type === frameData.type);
+    });
+}
+
+function updateFrameColorUI() {
+    frameColorOptions.querySelectorAll('.frame-color-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.color === frameData.color);
+    });
+}
+
+function updateInsetSliderUI() {
+    insetWidthSlider.value = frameData.insetWidth;
+    insetWidthValue.textContent = `${frameData.insetWidth}%`;
+}
+
+function updateFrameControlVisibility() {
+    const hasFrame = frameData.type !== 'none';
+    insetWidthGroup.style.display = hasFrame ? 'block' : 'none';
+    frameColorGroup.style.display = hasFrame ? 'block' : 'none';
+}
+
+function updateFramePreview() {
+    const img = framePreviewImage;
+    const container = framePreview;
+    
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    
+    if (frameData.type === 'none') {
+        // No frame - show image normally
+        container.style.padding = '0';
+        container.style.backgroundColor = 'transparent';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '300px';
+    } else {
+        // Calculate frame padding based on inset width
+        const maxDimension = 300;
+        const paddingPercent = frameData.insetWidth / 100;
+        const padding = Math.round(maxDimension * paddingPercent * 0.15); // Scale down for preview
+        
+        // Apply frame styling
+        container.style.padding = `${Math.max(padding, 4)}px`;
+        container.style.backgroundColor = frameData.color;
+        
+        // If aspect ratio frame, adjust the image container
+        if (frameData.type !== 'even') {
+            // Parse aspect ratio
+            const [w, h] = frameData.type.split(':').map(Number);
+            const targetRatio = w / h;
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            
+            // The frame creates space around the image to achieve target ratio
+            // For preview, we just show the frame color around the image
+            container.style.backgroundColor = frameData.color;
+        }
+        
+        // Adjust image size within frame
+        const availableSize = maxDimension - (padding * 2);
+        img.style.maxWidth = `${availableSize}px`;
+        img.style.maxHeight = `${availableSize}px`;
+    }
+}
+
+// Frame type button handlers
+frameTypeOptions.addEventListener('click', (e) => {
+    const btn = e.target.closest('.frame-type-btn');
+    if (!btn) return;
+    
+    frameData.type = btn.dataset.type;
+    updateFrameTypeUI();
+    updateFrameControlVisibility();
+    updateFramePreview();
+});
+
+// Inset width slider handler
+insetWidthSlider.addEventListener('input', (e) => {
+    frameData.insetWidth = parseInt(e.target.value);
+    insetWidthValue.textContent = `${frameData.insetWidth}%`;
+    updateFramePreview();
+});
+
+// Frame color button handlers
+frameColorOptions.addEventListener('click', (e) => {
+    const btn = e.target.closest('.frame-color-btn');
+    if (!btn) return;
+    
+    frameData.color = btn.dataset.color;
+    updateFrameColorUI();
+    updateFramePreview();
+});
+
+function resetFrameData() {
+    frameData.type = 'none';
+    frameData.insetWidth = 10;
+    frameData.color = '#FFFFFF';
+}
+
 // Make functions available globally for onclick handlers
 window.editPost = editPost;
 window.togglePostSelection = togglePostSelection;
@@ -949,3 +1998,1218 @@ fetch('/api/health')
         console.warn('Could not connect to server:', err);
         showMessage('Warning: Could not connect to server. Make sure the editor server is running.', 'error');
     });
+
+// ========== Albums Functionality ==========
+
+// Album elements
+const mainTabs = document.getElementById('mainTabs');
+const photosTab = document.getElementById('photosTab');
+const albumsTab = document.getElementById('albumsTab');
+const albumEditView = document.getElementById('albumEditView');
+const albumsList = document.getElementById('albumsList');
+const createAlbumBtn = document.getElementById('createAlbumBtn');
+const refreshAlbumsBtn = document.getElementById('refreshAlbumsBtn');
+const backToAlbumsBtn = document.getElementById('backToAlbumsBtn');
+const albumForm = document.getElementById('albumForm');
+const albumNameInput = document.getElementById('albumNameInput');
+const albumDescInput = document.getElementById('albumDescInput');
+const albumFormTitle = document.getElementById('albumFormTitle');
+const albumSubmitBtn = document.getElementById('albumSubmitBtn');
+const albumSubmitBtnText = document.getElementById('albumSubmitBtnText');
+const deleteAlbumBtn = document.getElementById('deleteAlbumBtn');
+const albumFormMessage = document.getElementById('albumFormMessage');
+const albumPhotosSection = document.getElementById('albumPhotosSection');
+const albumPhotosGrid = document.getElementById('albumPhotosGrid');
+const albumPhotoCount = document.getElementById('albumPhotoCount');
+const addPhotosToAlbumBtn = document.getElementById('addPhotosToAlbumBtn');
+const addToAlbumBtn = document.getElementById('addToAlbumBtn');
+const layoutOptions = document.getElementById('layoutOptions');
+
+// Photo selection modal elements
+const photoSelectModal = document.getElementById('photoSelectModal');
+const modalPhotosList = document.getElementById('modalPhotosList');
+const closePhotoSelectBtn = document.getElementById('closePhotoSelectBtn');
+const cancelPhotoSelectBtn = document.getElementById('cancelPhotoSelectBtn');
+const confirmPhotoSelectBtn = document.getElementById('confirmPhotoSelectBtn');
+const modalSelectedCount = document.getElementById('modalSelectedCount');
+
+// Album selection modal elements
+const albumSelectModal = document.getElementById('albumSelectModal');
+const albumSelectList = document.getElementById('albumSelectList');
+const closeAlbumSelectBtn = document.getElementById('closeAlbumSelectBtn');
+const cancelAlbumSelectBtn = document.getElementById('cancelAlbumSelectBtn');
+
+// Thumbnail settings elements
+const thumbnailSection = document.getElementById('thumbnailSection');
+const thumbnailPreview = document.getElementById('thumbnailPreview');
+const thumbnailPhotoOptions = document.getElementById('thumbnailPhotoOptions');
+const stackedPreviewInput = document.getElementById('stackedPreviewInput');
+
+// Album state
+let currentEditingAlbumId = null;
+let isAlbumEditMode = false;
+let currentAlbumPhotoSlugs = [];
+let currentAlbumLayout = 'horizontal';
+let currentThumbnailSlug = null;
+let currentStackedPreview = true;
+let currentBgColor = '';
+let currentBgColorDark = '';
+let modalSelectedPhotos = new Set();
+let allPosts = [];
+
+// Background color elements
+const bgColorOptions = document.getElementById('bgColorOptions');
+const bgColorDarkOptions = document.getElementById('bgColorDarkOptions');
+const bgColorDarkRow = document.getElementById('bgColorDarkRow');
+
+// Layout option click handler
+if (layoutOptions) {
+    layoutOptions.addEventListener('click', (e) => {
+        const option = e.target.closest('.layout-option');
+        if (!option) return;
+        
+        const layout = option.dataset.layout;
+        currentAlbumLayout = layout;
+        
+        // Update UI
+        layoutOptions.querySelectorAll('.layout-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.layout === layout);
+        });
+    });
+}
+
+// Background color option handlers
+if (bgColorOptions) {
+    bgColorOptions.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bg-color-btn');
+        if (!btn) return;
+        
+        currentBgColor = btn.dataset.color;
+        
+        // Update UI
+        bgColorOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === currentBgColor);
+        });
+        
+        // Show/hide dark mode color row
+        if (bgColorDarkRow) {
+            bgColorDarkRow.style.display = currentBgColor ? 'flex' : 'none';
+        }
+    });
+}
+
+if (bgColorDarkOptions) {
+    bgColorDarkOptions.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bg-color-btn');
+        if (!btn) return;
+        
+        currentBgColorDark = btn.dataset.color;
+        
+        // Update UI
+        bgColorDarkOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === currentBgColorDark);
+        });
+    });
+}
+
+// Tab switching
+mainTabs.addEventListener('click', (e) => {
+    const tabBtn = e.target.closest('.tab-btn');
+    if (!tabBtn) return;
+    
+    const tabName = tabBtn.dataset.tab;
+    
+    // Update tab buttons
+    mainTabs.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    tabBtn.classList.add('active');
+    
+    // Update tab content
+    if (tabName === 'photos') {
+        photosTab.classList.add('active');
+        albumsTab.classList.remove('active');
+        albumEditView.style.display = 'none';
+        // Switch to management view (list) if in form view
+        showManagementView();
+    } else if (tabName === 'albums') {
+        photosTab.classList.remove('active');
+        albumsTab.classList.add('active');
+        albumEditView.style.display = 'none';
+        loadAlbums();
+    }
+});
+
+// Load albums
+async function loadAlbums() {
+    try {
+        albumsList.innerHTML = '<div class="loading">Loading albums...</div>';
+        
+        const response = await fetch('/api/albums');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load albums');
+        }
+        
+        // Also fetch posts for preview images
+        const postsResponse = await fetch('/api/posts');
+        const postsData = await postsResponse.json();
+        allPosts = postsData.posts || [];
+        
+        if (data.albums.length === 0) {
+            albumsList.innerHTML = '<div class="empty-state">No albums yet. Click "Create Album" to get started!</div>';
+            return;
+        }
+        
+        renderAlbums(data.albums);
+        
+    } catch (error) {
+        console.error('Error loading albums:', error);
+        albumsList.innerHTML = `<div class="error-state">Error loading albums: ${error.message}</div>`;
+    }
+}
+
+// Render albums
+function renderAlbums(albums) {
+    // Create a map of posts for quick lookup
+    const postsMap = {};
+    allPosts.forEach(post => {
+        postsMap[post.slug] = post;
+    });
+    
+    albumsList.innerHTML = albums.map(album => {
+        const photoCount = album.photoSlugs ? album.photoSlugs.length : 0;
+        
+        // Get preview images (up to 4)
+        const previewImages = [];
+        if (album.photoSlugs) {
+            for (let i = 0; i < Math.min(4, album.photoSlugs.length); i++) {
+                const post = postsMap[album.photoSlugs[i]];
+                if (post && post.image) {
+                    previewImages.push(post.image);
+                }
+            }
+        }
+        
+        let previewHtml = '';
+        if (previewImages.length > 0) {
+            previewHtml = previewImages.map(img => `<img src="${img}" alt="">`).join('');
+        } else {
+            previewHtml = `
+                <div class="album-card-preview-empty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="album-card-editor" data-album-id="${album.id}" onclick="editAlbum('${album.id}')">
+                <div class="album-card-preview">
+                    ${previewHtml}
+                </div>
+                <div class="album-card-info">
+                    <h3 class="album-card-name">${escapeHtml(album.name)}</h3>
+                    ${album.description ? `<p class="album-card-desc">${escapeHtml(album.description)}</p>` : ''}
+                    <div class="album-card-meta">${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Create album button
+createAlbumBtn.addEventListener('click', () => {
+    showAlbumForm();
+});
+
+refreshAlbumsBtn.addEventListener('click', () => {
+    loadAlbums();
+});
+
+backToAlbumsBtn.addEventListener('click', () => {
+    showAlbumsView();
+});
+
+// Show album form for creating new album
+function showAlbumForm() {
+    isAlbumEditMode = false;
+    currentEditingAlbumId = null;
+    currentAlbumPhotoSlugs = [];
+    currentAlbumLayout = 'horizontal';
+    currentThumbnailSlug = null;
+    currentStackedPreview = true;
+    currentBgColor = '';
+    currentBgColorDark = '';
+    
+    albumFormTitle.textContent = 'Create Album';
+    albumSubmitBtnText.textContent = 'Create Album';
+    deleteAlbumBtn.style.display = 'none';
+    albumPhotosSection.style.display = 'none';
+    thumbnailSection.style.display = 'none';
+    
+    albumForm.reset();
+    albumFormMessage.style.display = 'none';
+    
+    // Reset layout selection
+    if (layoutOptions) {
+        layoutOptions.querySelectorAll('.layout-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.layout === 'horizontal');
+        });
+    }
+    
+    // Reset thumbnail settings
+    if (stackedPreviewInput) {
+        stackedPreviewInput.checked = true;
+    }
+    
+    // Reset background color options
+    if (bgColorOptions) {
+        bgColorOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === '');
+        });
+    }
+    if (bgColorDarkOptions) {
+        bgColorDarkOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === '');
+        });
+    }
+    if (bgColorDarkRow) {
+        bgColorDarkRow.style.display = 'none';
+    }
+    
+    albumsTab.classList.remove('active');
+    albumEditView.style.display = 'block';
+}
+
+// Edit existing album
+async function editAlbum(albumId) {
+    try {
+        isAlbumEditMode = true;
+        currentEditingAlbumId = albumId;
+        
+        albumFormTitle.textContent = 'Edit Album';
+        albumSubmitBtnText.textContent = 'Update Album';
+        deleteAlbumBtn.style.display = 'block';
+        albumFormMessage.style.display = 'none';
+        
+        // Load album data
+        const response = await fetch(`/api/albums/${albumId}`);
+        const album = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(album.error || 'Failed to load album');
+        }
+        
+        // Populate form
+        albumNameInput.value = album.name || '';
+        albumDescInput.value = album.description || '';
+        currentAlbumPhotoSlugs = album.photoSlugs || [];
+        currentAlbumLayout = album.layout || 'horizontal';
+        currentThumbnailSlug = album.thumbnailSlug || null;
+        currentStackedPreview = album.stackedPreview !== false; // Default to true
+        currentBgColor = album.bgColor || '';
+        currentBgColorDark = album.bgColorDark || '';
+        
+        // Update layout selection UI
+        if (layoutOptions) {
+            layoutOptions.querySelectorAll('.layout-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.layout === currentAlbumLayout);
+            });
+        }
+        
+        // Update stacked preview checkbox
+        if (stackedPreviewInput) {
+            stackedPreviewInput.checked = currentStackedPreview;
+        }
+        
+        // Update background color UI
+        if (bgColorOptions) {
+            bgColorOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.color === currentBgColor);
+            });
+        }
+        if (bgColorDarkOptions) {
+            bgColorDarkOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.color === currentBgColorDark);
+            });
+        }
+        if (bgColorDarkRow) {
+            bgColorDarkRow.style.display = currentBgColor ? 'flex' : 'none';
+        }
+        
+        // Show photos section and thumbnail settings
+        albumPhotosSection.style.display = 'block';
+        thumbnailSection.style.display = currentAlbumPhotoSlugs.length > 0 ? 'block' : 'none';
+        renderAlbumPhotos();
+        renderThumbnailOptions();
+        
+        albumsTab.classList.remove('active');
+        albumEditView.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading album:', error);
+        showAlbumFormMessage(`Error loading album: ${error.message}`, 'error');
+    }
+}
+
+// Render photos in album edit form
+function renderAlbumPhotos() {
+    const postsMap = {};
+    allPosts.forEach(post => {
+        postsMap[post.slug] = post;
+    });
+    
+    albumPhotoCount.textContent = currentAlbumPhotoSlugs.length;
+    
+    if (currentAlbumPhotoSlugs.length === 0) {
+        albumPhotosGrid.innerHTML = '<div class="empty-state" style="padding: 1rem;">No photos in this album yet.</div>';
+        return;
+    }
+    
+    albumPhotosGrid.innerHTML = currentAlbumPhotoSlugs.map((slug, index) => {
+        const post = postsMap[slug];
+        if (!post || !post.image) return '';
+        
+        return `
+            <div class="album-photo-item" data-slug="${slug}" data-index="${index}" draggable="true">
+                <div class="album-photo-drag-handle" title="Drag to reorder">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="5" r="1"></circle>
+                        <circle cx="9" cy="12" r="1"></circle>
+                        <circle cx="9" cy="19" r="1"></circle>
+                        <circle cx="15" cy="5" r="1"></circle>
+                        <circle cx="15" cy="12" r="1"></circle>
+                        <circle cx="15" cy="19" r="1"></circle>
+                    </svg>
+                </div>
+                <img src="${post.image}" alt="${escapeHtml(post.title || 'Photo')}">
+                <button type="button" class="album-photo-remove" onclick="removePhotoFromAlbum('${slug}')" title="Remove from album">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="album-photo-order">${index + 1}</div>
+            </div>
+        `;
+    }).filter(html => html).join('');
+    
+    // Add drag-and-drop event listeners
+    initAlbumPhotoDragDrop();
+    
+    // Update thumbnail section visibility and options
+    if (thumbnailSection) {
+        thumbnailSection.style.display = currentAlbumPhotoSlugs.length > 0 ? 'block' : 'none';
+        if (currentAlbumPhotoSlugs.length > 0) {
+            renderThumbnailOptions();
+        }
+    }
+}
+
+// Drag and drop for album photo reordering
+let draggedPhotoItem = null;
+let draggedPhotoIndex = null;
+
+function initAlbumPhotoDragDrop() {
+    const items = albumPhotosGrid.querySelectorAll('.album-photo-item');
+    
+    items.forEach(item => {
+        item.addEventListener('dragstart', handleAlbumPhotoDragStart);
+        item.addEventListener('dragend', handleAlbumPhotoDragEnd);
+        item.addEventListener('dragover', handleAlbumPhotoDragOver);
+        item.addEventListener('dragenter', handleAlbumPhotoDragEnter);
+        item.addEventListener('dragleave', handleAlbumPhotoDragLeave);
+        item.addEventListener('drop', handleAlbumPhotoDrop);
+    });
+}
+
+function handleAlbumPhotoDragStart(e) {
+    draggedPhotoItem = this;
+    draggedPhotoIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.slug);
+}
+
+function handleAlbumPhotoDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedPhotoItem = null;
+    draggedPhotoIndex = null;
+    
+    // Remove all drag-over classes
+    albumPhotosGrid.querySelectorAll('.album-photo-item').forEach(item => {
+        item.classList.remove('drag-over', 'drag-over-left', 'drag-over-right');
+    });
+}
+
+function handleAlbumPhotoDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleAlbumPhotoDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedPhotoItem) {
+        const thisIndex = parseInt(this.dataset.index);
+        // Show indicator on which side the item will be inserted
+        if (thisIndex < draggedPhotoIndex) {
+            this.classList.add('drag-over-left');
+        } else {
+            this.classList.add('drag-over-right');
+        }
+    }
+}
+
+function handleAlbumPhotoDragLeave(e) {
+    this.classList.remove('drag-over', 'drag-over-left', 'drag-over-right');
+}
+
+function handleAlbumPhotoDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (this !== draggedPhotoItem) {
+        const fromIndex = draggedPhotoIndex;
+        const toIndex = parseInt(this.dataset.index);
+        
+        // Reorder the array
+        const [movedSlug] = currentAlbumPhotoSlugs.splice(fromIndex, 1);
+        currentAlbumPhotoSlugs.splice(toIndex, 0, movedSlug);
+        
+        // Re-render
+        renderAlbumPhotos();
+    }
+    
+    return false;
+}
+
+// Remove photo from album
+function removePhotoFromAlbum(slug) {
+    currentAlbumPhotoSlugs = currentAlbumPhotoSlugs.filter(s => s !== slug);
+    
+    // If removed photo was the thumbnail, reset thumbnail
+    if (currentThumbnailSlug === slug) {
+        currentThumbnailSlug = currentAlbumPhotoSlugs[0] || null;
+    }
+    
+    renderAlbumPhotos();
+    renderThumbnailOptions();
+    
+    // Hide thumbnail section if no photos left
+    if (thumbnailSection) {
+        thumbnailSection.style.display = currentAlbumPhotoSlugs.length > 0 ? 'block' : 'none';
+    }
+}
+
+// Render thumbnail selection options
+function renderThumbnailOptions() {
+    if (!thumbnailPhotoOptions || !thumbnailPreview) return;
+    
+    const postsMap = {};
+    allPosts.forEach(post => {
+        postsMap[post.slug] = post;
+    });
+    
+    // If no thumbnail selected, default to first photo
+    if (!currentThumbnailSlug && currentAlbumPhotoSlugs.length > 0) {
+        currentThumbnailSlug = currentAlbumPhotoSlugs[0];
+    }
+    
+    // Update preview
+    updateThumbnailPreview(postsMap);
+    
+    // Render photo options
+    if (currentAlbumPhotoSlugs.length === 0) {
+        thumbnailPhotoOptions.innerHTML = '<div class="empty-state" style="padding: 0.5rem; font-size: 12px;">Add photos to select a thumbnail</div>';
+        return;
+    }
+    
+    thumbnailPhotoOptions.innerHTML = currentAlbumPhotoSlugs.map(slug => {
+        const post = postsMap[slug];
+        if (!post || !post.image) return '';
+        
+        const isSelected = slug === currentThumbnailSlug;
+        return `
+            <div class="thumbnail-option ${isSelected ? 'selected' : ''}" 
+                 data-slug="${slug}" 
+                 onclick="selectThumbnail('${slug}')"
+                 title="${escapeHtml(post.title || 'Photo')}">
+                <img src="${post.image}" alt="${escapeHtml(post.title || 'Photo')}">
+                ${isSelected ? '<div class="thumbnail-option-check"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>' : ''}
+            </div>
+        `;
+    }).filter(html => html).join('');
+}
+
+// Update thumbnail preview display
+function updateThumbnailPreview(postsMap) {
+    if (!thumbnailPreview) return;
+    
+    if (!currentThumbnailSlug) {
+        thumbnailPreview.innerHTML = '<span class="thumbnail-preview-empty">Select a photo</span>';
+        return;
+    }
+    
+    const post = postsMap[currentThumbnailSlug];
+    if (!post || !post.image) {
+        thumbnailPreview.innerHTML = '<span class="thumbnail-preview-empty">Select a photo</span>';
+        return;
+    }
+    
+    if (currentStackedPreview && currentAlbumPhotoSlugs.length > 1) {
+        // Show stacked preview - thumbnail on top with others behind
+        const otherSlugs = currentAlbumPhotoSlugs.filter(s => s !== currentThumbnailSlug).slice(0, 3);
+        let stackHtml = '';
+        
+        // Background photos
+        otherSlugs.forEach((slug, i) => {
+            const otherPost = postsMap[slug];
+            if (otherPost && otherPost.image) {
+                const rotation = (i % 2 === 0 ? -1 : 1) * (4 + i * 2);
+                const translate = (i % 2 === 0 ? -1 : 1) * (3 + i * 2);
+                stackHtml += `<img src="${otherPost.image}" class="thumbnail-preview-stacked" style="transform: rotate(${rotation}deg) translate(${translate}px, ${translate}px); z-index: ${i};">`;
+            }
+        });
+        
+        // Top photo (thumbnail)
+        stackHtml += `<img src="${post.image}" class="thumbnail-preview-top" style="z-index: 10;">`;
+        
+        thumbnailPreview.innerHTML = stackHtml;
+        thumbnailPreview.classList.add('stacked');
+    } else {
+        // Single photo preview
+        thumbnailPreview.innerHTML = `<img src="${post.image}" class="thumbnail-preview-single">`;
+        thumbnailPreview.classList.remove('stacked');
+    }
+}
+
+// Select thumbnail photo
+function selectThumbnail(slug) {
+    currentThumbnailSlug = slug;
+    renderThumbnailOptions();
+}
+
+// Stacked preview checkbox handler
+if (stackedPreviewInput) {
+    stackedPreviewInput.addEventListener('change', () => {
+        currentStackedPreview = stackedPreviewInput.checked;
+        
+        const postsMap = {};
+        allPosts.forEach(post => {
+            postsMap[post.slug] = post;
+        });
+        updateThumbnailPreview(postsMap);
+    });
+}
+
+// Make selectThumbnail available globally
+window.selectThumbnail = selectThumbnail;
+
+// Show albums view
+function showAlbumsView() {
+    albumEditView.style.display = 'none';
+    albumsTab.classList.add('active');
+    loadAlbums();
+}
+
+// Album form submission
+albumForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    albumFormMessage.style.display = 'none';
+    
+    const name = albumNameInput.value.trim();
+    if (!name) {
+        showAlbumFormMessage('Album name is required', 'error');
+        return;
+    }
+    
+    albumSubmitBtn.disabled = true;
+    albumSubmitBtnText.style.display = 'none';
+    albumSubmitBtn.querySelector('.btn-loader').style.display = 'block';
+    
+    try {
+        const albumData = {
+            name: name,
+            description: albumDescInput.value.trim(),
+            photoSlugs: currentAlbumPhotoSlugs,
+            layout: currentAlbumLayout,
+            thumbnailSlug: currentThumbnailSlug,
+            stackedPreview: currentStackedPreview,
+            bgColor: currentBgColor || null,
+            bgColorDark: currentBgColorDark || null
+        };
+        
+        let response;
+        if (isAlbumEditMode) {
+            response = await fetch(`/api/albums/${currentEditingAlbumId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(albumData)
+            });
+        } else {
+            response = await fetch('/api/albums', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(albumData)
+            });
+        }
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlbumFormMessage(isAlbumEditMode ? 'Album updated!' : 'Album created!', 'success');
+            setTimeout(() => showAlbumsView(), 1000);
+        } else {
+            showAlbumFormMessage(data.error || 'Failed to save album', 'error');
+        }
+    } catch (error) {
+        console.error('Album form error:', error);
+        showAlbumFormMessage('An error occurred. Please try again.', 'error');
+    } finally {
+        albumSubmitBtn.disabled = false;
+        albumSubmitBtnText.style.display = 'block';
+        albumSubmitBtn.querySelector('.btn-loader').style.display = 'none';
+    }
+});
+
+// Delete album
+deleteAlbumBtn.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete this album? Photos will not be deleted.')) {
+        return;
+    }
+    
+    try {
+        deleteAlbumBtn.disabled = true;
+        
+        const response = await fetch(`/api/albums/${currentEditingAlbumId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlbumFormMessage('Album deleted!', 'success');
+            setTimeout(() => showAlbumsView(), 500);
+        } else {
+            showAlbumFormMessage(data.error || 'Failed to delete album', 'error');
+            deleteAlbumBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Delete album error:', error);
+        showAlbumFormMessage('An error occurred. Please try again.', 'error');
+        deleteAlbumBtn.disabled = false;
+    }
+});
+
+function showAlbumFormMessage(text, type) {
+    albumFormMessage.textContent = text;
+    albumFormMessage.className = `message ${type}`;
+    albumFormMessage.style.display = 'block';
+}
+
+// ========== Photo Selection Modal ==========
+
+// Open photo selection modal from album edit form
+addPhotosToAlbumBtn.addEventListener('click', () => {
+    openPhotoSelectModal('album');
+});
+
+// Open photo selection modal
+async function openPhotoSelectModal(mode) {
+    modalSelectedPhotos.clear();
+    updateModalSelectedCount();
+    
+    // Load posts if not already loaded
+    if (allPosts.length === 0) {
+        const response = await fetch('/api/posts');
+        const data = await response.json();
+        allPosts = data.posts || [];
+    }
+    
+    // Render photos
+    const existingSlugs = new Set(currentAlbumPhotoSlugs);
+    modalPhotosList.innerHTML = allPosts.map(post => {
+        if (!post.image) return '';
+        const isInAlbum = existingSlugs.has(post.slug);
+        return `
+            <div class="modal-photo-item ${isInAlbum ? 'selected' : ''}" data-slug="${post.slug}" onclick="toggleModalPhoto('${post.slug}')">
+                <img src="${post.image}" alt="${escapeHtml(post.title || 'Photo')}">
+            </div>
+        `;
+    }).filter(html => html).join('');
+    
+    photoSelectModal.style.display = 'flex';
+}
+
+// Toggle photo selection in modal
+function toggleModalPhoto(slug) {
+    const item = modalPhotosList.querySelector(`[data-slug="${slug}"]`);
+    if (!item) return;
+    
+    if (modalSelectedPhotos.has(slug)) {
+        modalSelectedPhotos.delete(slug);
+        item.classList.remove('selected');
+    } else {
+        modalSelectedPhotos.add(slug);
+        item.classList.add('selected');
+    }
+    
+    updateModalSelectedCount();
+}
+
+function updateModalSelectedCount() {
+    modalSelectedCount.textContent = modalSelectedPhotos.size;
+}
+
+// Close photo selection modal
+function closePhotoSelectModal() {
+    photoSelectModal.style.display = 'none';
+    modalSelectedPhotos.clear();
+}
+
+closePhotoSelectBtn.addEventListener('click', closePhotoSelectModal);
+cancelPhotoSelectBtn.addEventListener('click', closePhotoSelectModal);
+
+// Confirm photo selection
+confirmPhotoSelectBtn.addEventListener('click', () => {
+    // Add selected photos to current album
+    const newSlugs = Array.from(modalSelectedPhotos);
+    currentAlbumPhotoSlugs = [...new Set([...currentAlbumPhotoSlugs, ...newSlugs])];
+    renderAlbumPhotos();
+    closePhotoSelectModal();
+});
+
+// ========== Add Photos to Album (from photos view) ==========
+
+// Show "Add to Album" and "Bulk Edit" buttons when in select mode
+function updateSelectedCount() {
+    selectedCountSpan.textContent = selectedPosts.size;
+    deleteSelectedBtn.disabled = selectedPosts.size === 0;
+    
+    // Show/hide Add to Album button
+    if (addToAlbumBtn) {
+        addToAlbumBtn.style.display = selectedPosts.size > 0 ? 'inline-flex' : 'none';
+    }
+    
+    // Show/hide Bulk Edit button
+    const bulkEditBtn = document.getElementById('bulkEditBtn');
+    if (bulkEditBtn) {
+        bulkEditBtn.style.display = selectedPosts.size > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+// Open album selection modal
+addToAlbumBtn.addEventListener('click', async () => {
+    if (selectedPosts.size === 0) return;
+    
+    // Load albums
+    const response = await fetch('/api/albums');
+    const data = await response.json();
+    
+    if (data.albums.length === 0) {
+        albumSelectList.innerHTML = `
+            <div class="album-select-empty">
+                <p>No albums yet.</p>
+                <button class="btn btn-primary btn-sm" onclick="closeAlbumSelectModal(); switchToAlbumsTab();">Create Album</button>
+            </div>
+        `;
+    } else {
+        albumSelectList.innerHTML = data.albums.map(album => `
+            <div class="album-select-item" onclick="addSelectedPhotosToAlbum('${album.id}')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <div class="album-select-item-info">
+                    <div class="album-select-item-name">${escapeHtml(album.name)}</div>
+                    <div class="album-select-item-count">${album.photoSlugs ? album.photoSlugs.length : 0} photos</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    albumSelectModal.style.display = 'flex';
+});
+
+// Add selected photos to album
+async function addSelectedPhotosToAlbum(albumId) {
+    try {
+        const photoSlugs = Array.from(selectedPosts);
+        
+        const response = await fetch(`/api/albums/${albumId}/photos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photoSlugs })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showListMessage(`Added ${photoSlugs.length} photo${photoSlugs.length > 1 ? 's' : ''} to album!`, 'success');
+            closeAlbumSelectModal();
+            exitSelectMode();
+        } else {
+            showListMessage(data.error || 'Failed to add photos to album', 'error');
+        }
+    } catch (error) {
+        console.error('Error adding photos to album:', error);
+        showListMessage('An error occurred. Please try again.', 'error');
+    }
+}
+
+// Close album selection modal
+function closeAlbumSelectModal() {
+    albumSelectModal.style.display = 'none';
+}
+
+closeAlbumSelectBtn.addEventListener('click', closeAlbumSelectModal);
+cancelAlbumSelectBtn.addEventListener('click', closeAlbumSelectModal);
+
+// Switch to albums tab
+function switchToAlbumsTab() {
+    const albumsTabBtn = mainTabs.querySelector('[data-tab="albums"]');
+    if (albumsTabBtn) {
+        albumsTabBtn.click();
+    }
+}
+
+// Make functions globally available
+window.editAlbum = editAlbum;
+window.removePhotoFromAlbum = removePhotoFromAlbum;
+window.toggleModalPhoto = toggleModalPhoto;
+window.addSelectedPhotosToAlbum = addSelectedPhotosToAlbum;
+window.closeAlbumSelectModal = closeAlbumSelectModal;
+window.switchToAlbumsTab = switchToAlbumsTab;
+
+// ========== Bulk Edit Functionality ==========
+
+// Bulk edit elements
+const bulkEditBtn = document.getElementById('bulkEditBtn');
+const bulkEditModal = document.getElementById('bulkEditModal');
+const closeBulkEditBtn = document.getElementById('closeBulkEditBtn');
+const cancelBulkEditBtn = document.getElementById('cancelBulkEditBtn');
+const applyBulkEditBtn = document.getElementById('applyBulkEditBtn');
+const bulkEditCount = document.getElementById('bulkEditCount');
+const bulkTitleInput = document.getElementById('bulkTitleInput');
+const bulkDescriptionInput = document.getElementById('bulkDescriptionInput');
+const bulkPhotoDateInput = document.getElementById('bulkPhotoDateInput');
+const bulkCameraInput = document.getElementById('bulkCameraInput');
+const bulkFrameTypeOptions = document.getElementById('bulkFrameTypeOptions');
+const bulkInsetWidthGroup = document.getElementById('bulkInsetWidthGroup');
+const bulkInsetWidthSlider = document.getElementById('bulkInsetWidthSlider');
+const bulkInsetWidthValue = document.getElementById('bulkInsetWidthValue');
+const bulkFrameColorGroup = document.getElementById('bulkFrameColorGroup');
+const bulkFrameColorOptions = document.getElementById('bulkFrameColorOptions');
+
+// Bulk frame state
+let bulkFrameData = {
+    type: '',          // '' means no change, 'none' removes frame
+    insetWidth: 10,
+    color: '#FFFFFF'
+};
+
+// Bulk location state
+let bulkLocation = null; // { name, lat, lng }
+let bulkLocationSearchTimeout = null;
+
+// Bulk location elements
+const bulkLocationSearch = document.getElementById('bulkLocationSearch');
+const bulkLocationResults = document.getElementById('bulkLocationResults');
+const bulkSelectedLocation = document.getElementById('bulkSelectedLocation');
+const bulkSelectedLocationName = document.getElementById('bulkSelectedLocationName');
+const clearBulkLocationBtn = document.getElementById('clearBulkLocationBtn');
+
+// Reset bulk frame state
+function resetBulkFrameData() {
+    bulkFrameData = {
+        type: '',
+        insetWidth: 10,
+        color: '#FFFFFF'
+    };
+    
+    // Reset UI
+    if (bulkFrameTypeOptions) {
+        bulkFrameTypeOptions.querySelectorAll('.frame-type-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.type === '');
+        });
+    }
+    if (bulkInsetWidthSlider) {
+        bulkInsetWidthSlider.value = 10;
+        bulkInsetWidthValue.textContent = '10%';
+    }
+    if (bulkFrameColorOptions) {
+        bulkFrameColorOptions.querySelectorAll('.frame-color-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.color === '#FFFFFF');
+        });
+    }
+    if (bulkInsetWidthGroup) bulkInsetWidthGroup.style.display = 'none';
+    if (bulkFrameColorGroup) bulkFrameColorGroup.style.display = 'none';
+}
+
+// Reset bulk location state
+function resetBulkLocation() {
+    bulkLocation = null;
+    if (bulkLocationSearch) bulkLocationSearch.value = '';
+    if (bulkLocationResults) bulkLocationResults.style.display = 'none';
+    if (bulkSelectedLocation) bulkSelectedLocation.style.display = 'none';
+    if (bulkSelectedLocationName) bulkSelectedLocationName.textContent = '';
+}
+
+// Open bulk edit modal
+function openBulkEditModal() {
+    if (selectedPosts.size === 0) return;
+    
+    // Reset form
+    bulkTitleInput.value = '';
+    bulkDescriptionInput.value = '';
+    bulkPhotoDateInput.value = '';
+    bulkCameraInput.value = '';
+    resetBulkFrameData();
+    resetBulkLocation();
+    
+    // Update count
+    bulkEditCount.textContent = selectedPosts.size;
+    
+    // Show modal
+    bulkEditModal.style.display = 'flex';
+}
+
+// Close bulk edit modal
+function closeBulkEditModal() {
+    bulkEditModal.style.display = 'none';
+}
+
+// Apply bulk edit
+async function applyBulkEdit() {
+    if (selectedPosts.size === 0) return;
+    
+    const slugs = Array.from(selectedPosts);
+    const updates = {};
+    
+    // Collect non-empty fields
+    if (bulkTitleInput.value.trim()) {
+        updates.title = bulkTitleInput.value.trim();
+    }
+    if (bulkDescriptionInput.value.trim()) {
+        updates.description = bulkDescriptionInput.value.trim();
+    }
+    if (bulkPhotoDateInput.value) {
+        updates.photoDate = bulkPhotoDateInput.value;
+    }
+    if (bulkCameraInput.value.trim()) {
+        updates.camera = bulkCameraInput.value.trim();
+    }
+    
+    // Handle frame settings
+    if (bulkFrameData.type !== '') {
+        updates.frame = {
+            type: bulkFrameData.type,
+            insetWidth: bulkFrameData.insetWidth,
+            color: bulkFrameData.color
+        };
+    }
+    
+    // Handle location
+    if (bulkLocation) {
+        updates.location = {
+            name: bulkLocation.name,
+            lat: bulkLocation.lat,
+            lng: bulkLocation.lng
+        };
+    }
+    
+    // Check if there's anything to update
+    if (Object.keys(updates).length === 0) {
+        showListMessage('No changes to apply.', 'info');
+        closeBulkEditModal();
+        return;
+    }
+    
+    // Show loading state
+    applyBulkEditBtn.disabled = true;
+    applyBulkEditBtn.textContent = 'Applying...';
+    showListMessage(`Updating ${slugs.length} photo${slugs.length > 1 ? 's' : ''}...`, 'info');
+    
+    try {
+        const response = await fetch('/api/posts/batch-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slugs, updates })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showListMessage(`Successfully updated ${data.updated} photo${data.updated > 1 ? 's' : ''}.`, 'success');
+            closeBulkEditModal();
+            exitSelectMode();
+            loadPosts(); // Refresh the list
+        } else {
+            showListMessage(data.error || 'Failed to update some photos', 'error');
+        }
+    } catch (error) {
+        console.error('Error bulk updating posts:', error);
+        showListMessage('Network error. Please try again.', 'error');
+    } finally {
+        applyBulkEditBtn.disabled = false;
+        applyBulkEditBtn.textContent = 'Apply Changes';
+    }
+}
+
+// Event listeners for bulk edit
+if (bulkEditBtn) {
+    bulkEditBtn.addEventListener('click', openBulkEditModal);
+}
+
+if (closeBulkEditBtn) {
+    closeBulkEditBtn.addEventListener('click', closeBulkEditModal);
+}
+
+if (cancelBulkEditBtn) {
+    cancelBulkEditBtn.addEventListener('click', closeBulkEditModal);
+}
+
+if (applyBulkEditBtn) {
+    applyBulkEditBtn.addEventListener('click', applyBulkEdit);
+}
+
+// Bulk frame type selection
+if (bulkFrameTypeOptions) {
+    bulkFrameTypeOptions.querySelectorAll('.frame-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            bulkFrameTypeOptions.querySelectorAll('.frame-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            bulkFrameData.type = btn.dataset.type;
+            
+            // Show/hide inset and color options
+            const showOptions = bulkFrameData.type !== '' && bulkFrameData.type !== 'none';
+            if (bulkInsetWidthGroup) bulkInsetWidthGroup.style.display = showOptions ? 'block' : 'none';
+            if (bulkFrameColorGroup) bulkFrameColorGroup.style.display = showOptions ? 'block' : 'none';
+        });
+    });
+}
+
+// Bulk inset width slider
+if (bulkInsetWidthSlider) {
+    bulkInsetWidthSlider.addEventListener('input', () => {
+        bulkFrameData.insetWidth = parseInt(bulkInsetWidthSlider.value);
+        bulkInsetWidthValue.textContent = bulkFrameData.insetWidth + '%';
+    });
+}
+
+// Bulk frame color selection
+if (bulkFrameColorOptions) {
+    bulkFrameColorOptions.querySelectorAll('.frame-color-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            bulkFrameColorOptions.querySelectorAll('.frame-color-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            bulkFrameData.color = btn.dataset.color;
+        });
+    });
+}
+
+// Close modal on backdrop click
+if (bulkEditModal) {
+    bulkEditModal.addEventListener('click', (e) => {
+        if (e.target === bulkEditModal) {
+            closeBulkEditModal();
+        }
+    });
+}
+
+// ========== Bulk Location Search ==========
+
+// Search locations for bulk edit
+async function searchBulkLocations(query) {
+    if (!query || query.length < 2) {
+        if (bulkLocationResults) bulkLocationResults.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+            {
+                headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'PanascenicPhotoEditor/1.0'
+                }
+            }
+        );
+        
+        if (!response.ok) throw new Error('Search failed');
+        
+        const results = await response.json();
+        
+        if (results.length === 0) {
+            bulkLocationResults.innerHTML = '<div class="location-result-item no-results">No locations found</div>';
+            bulkLocationResults.style.display = 'block';
+            return;
+        }
+        
+        bulkLocationResults.innerHTML = results.map(result => `
+            <div class="location-result-item" data-name="${result.display_name.replace(/"/g, '&quot;')}" data-lat="${result.lat}" data-lng="${result.lon}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                </svg>
+                <span>${result.display_name}</span>
+            </div>
+        `).join('');
+        bulkLocationResults.style.display = 'block';
+        
+        // Add click handlers to results
+        bulkLocationResults.querySelectorAll('.location-result-item:not(.no-results)').forEach(item => {
+            item.addEventListener('click', () => {
+                selectBulkLocation({
+                    name: item.dataset.name,
+                    lat: parseFloat(item.dataset.lat),
+                    lng: parseFloat(item.dataset.lng)
+                });
+            });
+        });
+    } catch (error) {
+        console.error('Error searching locations:', error);
+        bulkLocationResults.innerHTML = '<div class="location-result-item no-results">Search failed</div>';
+        bulkLocationResults.style.display = 'block';
+    }
+}
+
+// Select a location for bulk edit
+function selectBulkLocation(location) {
+    bulkLocation = location;
+    bulkSelectedLocationName.textContent = location.name;
+    bulkSelectedLocation.style.display = 'flex';
+    bulkLocationSearch.value = '';
+    bulkLocationResults.style.display = 'none';
+}
+
+// Bulk location search input handler with debounce
+if (bulkLocationSearch) {
+    bulkLocationSearch.addEventListener('input', (e) => {
+        clearTimeout(bulkLocationSearchTimeout);
+        bulkLocationSearchTimeout = setTimeout(() => {
+            searchBulkLocations(e.target.value.trim());
+        }, 300);
+    });
+}
+
+// Clear bulk location button
+if (clearBulkLocationBtn) {
+    clearBulkLocationBtn.addEventListener('click', () => {
+        resetBulkLocation();
+    });
+}
+
+// Make bulk edit functions globally available
+window.openBulkEditModal = openBulkEditModal;
+window.closeBulkEditModal = closeBulkEditModal;
+window.applyBulkEdit = applyBulkEdit;

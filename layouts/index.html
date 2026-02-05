@@ -1,26 +1,200 @@
 {{ define "main" }}
+{{ $albums := .Site.Data.albums.albums | default slice }}
+{{ $albumCount := len $albums }}
 <div class="container">
+    <!-- Collapsible Albums Section -->
+    {{ if gt $albumCount 0 }}
+    <div class="albums-section" id="albumsSection">
+        <button class="albums-toggle" id="albumsToggle" aria-expanded="false" aria-controls="albumsList">
+            <svg class="albums-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span class="albums-toggle-text">Albums</span>
+            <span class="albums-count">({{ $albumCount }})</span>
+            <svg class="albums-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
+        <div class="albums-content" id="albumsContent">
+            <div class="albums-list" id="albumsList">
+                {{ range $albums }}
+                {{ $album := . }}
+                {{ $photoCount := len .photoSlugs }}
+                {{/* Determine if using stacked preview (default true) */}}
+                {{ $stackedPreview := true }}
+                {{ if isset . "stackedPreview" }}
+                    {{ $stackedPreview = .stackedPreview }}
+                {{ end }}
+                {{ $thumbnailSlug := .thumbnailSlug | default "" }}
+                
+                <a href="{{ $.Site.BaseURL }}albums/{{ .id }}/" class="album-card">
+                    <div class="album-preview{{ if not $stackedPreview }} album-preview-custom{{ end }}">
+                        {{ if gt $photoCount 0 }}
+                            {{ if $stackedPreview }}
+                                {{/* Stacked photos preview */}}
+                                {{/* Build ordered list: up to 3 others first, then thumbnail on top (last in DOM = highest z-index) */}}
+                                {{ $orderedSlugs := slice }}
+                                {{ if $thumbnailSlug }}
+                                    {{/* Get up to 3 photos that aren't the thumbnail, then add thumbnail last */}}
+                                    {{ $otherCount := 0 }}
+                                    {{ range .photoSlugs }}
+                                        {{ if and (ne . $thumbnailSlug) (lt $otherCount 3) }}
+                                            {{ $orderedSlugs = $orderedSlugs | append . }}
+                                            {{ $otherCount = add $otherCount 1 }}
+                                        {{ end }}
+                                    {{ end }}
+                                    {{ $orderedSlugs = $orderedSlugs | append $thumbnailSlug }}
+                                {{ else }}
+                                    {{ $orderedSlugs = first 4 .photoSlugs }}
+                                {{ end }}
+                                
+                                {{ $previewCount := 0 }}
+                                {{ range $orderedSlugs }}
+                                    {{ $slug := . }}
+                                    {{ $photo := index (where $.Site.RegularPages "Section" "photos") 0 }}
+                                    {{ range where $.Site.RegularPages "Section" "photos" }}
+                                        {{ if eq (path.Base .File.Dir) $slug }}
+                                            {{ $photo = . }}
+                                        {{ end }}
+                                    {{ end }}
+                                    {{ if $photo }}
+                                        {{ $image := "" }}
+                                        {{ range $photo.Resources.ByType "image" }}
+                                            {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
+                                                {{ $image = . }}
+                                            {{ end }}
+                                        {{ end }}
+                                        {{ if $image }}
+                                            {{ $thumb := $image.Fit "150x150" }}
+                                            <img src="{{ $thumb.RelPermalink }}" alt="" class="album-preview-img" loading="lazy">
+                                            {{ $previewCount = add $previewCount 1 }}
+                                        {{ end }}
+                                    {{ end }}
+                                {{ end }}
+                            {{ else }}
+                                {{/* Single thumbnail preview */}}
+                                {{ $thumbSlugToUse := $thumbnailSlug | default (index .photoSlugs 0) }}
+                                {{ range where $.Site.RegularPages "Section" "photos" }}
+                                    {{ if eq (path.Base .File.Dir) $thumbSlugToUse }}
+                                        {{ $image := "" }}
+                                        {{ range .Resources.ByType "image" }}
+                                            {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
+                                                {{ $image = . }}
+                                            {{ end }}
+                                        {{ end }}
+                                        {{ if $image }}
+                                            {{ $thumb := $image.Fit "150x150" }}
+                                            <img src="{{ $thumb.RelPermalink }}" alt="{{ $album.name }}" class="album-thumbnail-custom" loading="lazy">
+                                        {{ end }}
+                                    {{ end }}
+                                {{ end }}
+                            {{ end }}
+                        {{ else }}
+                            <div class="album-preview-empty">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                </svg>
+                            </div>
+                        {{ end }}
+                    </div>
+                    <div class="album-info">
+                        <h3 class="album-name">{{ .name }}</h3>
+                        <span class="album-photo-count">{{ $photoCount }} photo{{ if ne $photoCount 1 }}s{{ end }}</span>
+                    </div>
+                </a>
+                {{ end }}
+            </div>
+        </div>
+    </div>
+    {{ end }}
+
     <div class="photo-grid">
-        {{ range where .Site.RegularPages "Section" "photos" }}
+        {{/* Get gallery order from data file */}}
+        {{ $galleryOrder := .Site.Data.galleryOrder.order | default slice }}
+        {{ $hasCustomOrder := gt (len $galleryOrder) 0 }}
+        
+        {{/* Get all photos */}}
+        {{ $allPhotos := where .Site.RegularPages "Section" "photos" }}
+        
+        {{/* Sort photos by gallery order if custom order exists */}}
+        {{ $sortedPhotos := slice }}
+        {{ if $hasCustomOrder }}
+            {{/* First add photos in gallery order */}}
+            {{ range $galleryOrder }}
+                {{ $slug := . }}
+                {{ range $allPhotos }}
+                    {{ if eq (path.Base .File.Dir) $slug }}
+                        {{ $sortedPhotos = $sortedPhotos | append . }}
+                    {{ end }}
+                {{ end }}
+            {{ end }}
+            {{/* Then add any remaining photos not in the order (new photos) */}}
+            {{ range $allPhotos }}
+                {{ $photo := . }}
+                {{ $photoSlug := path.Base .File.Dir }}
+                {{ $inOrder := false }}
+                {{ range $galleryOrder }}
+                    {{ if eq . $photoSlug }}
+                        {{ $inOrder = true }}
+                    {{ end }}
+                {{ end }}
+                {{ if not $inOrder }}
+                    {{ $sortedPhotos = $sortedPhotos | append $photo }}
+                {{ end }}
+            {{ end }}
+        {{ else }}
+            {{/* No custom order - use default (by date) */}}
+            {{ $sortedPhotos = $allPhotos }}
+        {{ end }}
+        
+        {{ range $sortedPhotos }}
         {{ $tags := .Params.tags | default (slice) }}
         {{ $tagsLower := slice }}
         {{ range $tags }}
             {{ $tagsLower = $tagsLower | append (lower .) }}
         {{ end }}
-        <article class="photo-item" data-tags="{{ delimit $tagsLower "," }}">
+        
+        {{/* Find dark mode image first (to exclude it from main image search) */}}
+        {{ $darkImage := .Resources.GetMatch "image-dark.*" }}
+        
+        {{/* Find custom thumbnail if exists */}}
+        {{ $customThumbnail := .Resources.GetMatch "thumbnail.*" }}
+        
+        {{/* Find main image - exclude dark mode and thumbnail */}}
+        {{ $image := "" }}
+        {{ range .Resources.ByType "image" }}
+            {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
+                {{ $image = . }}
+            {{ end }}
+        {{ end }}
+        
+        {{/* Determine thumbnail source */}}
+        {{ $thumbnailSrc := "" }}
+        {{ $thumbnailSrcDark := "" }}
+        {{ if $customThumbnail }}
+            {{ $thumbnailSrc = $customThumbnail.RelPermalink }}
+        {{ else if $image }}
+            {{ $thumbnail := $image.Fit "600x600" }}
+            {{ $thumbnailSrc = $thumbnail.RelPermalink }}
+        {{ else if .Params.image }}
+            {{ $thumbnailSrc = .Params.image | relURL }}
+        {{ end }}
+        
+        {{/* Dark mode thumbnail - use dark image or fall back to regular */}}
+        {{ if $darkImage }}
+            {{ $darkThumbnail := $darkImage.Fit "600x600" }}
+            {{ $thumbnailSrcDark = $darkThumbnail.RelPermalink }}
+        {{ end }}
+        
+        <article class="photo-item" data-slug="{{ path.Base .File.Dir }}" data-tags="{{ delimit $tagsLower "," }}"{{ if $thumbnailSrcDark }} data-dark-src="{{ $thumbnailSrcDark }}"{{ end }}>
             <a href="{{ .RelPermalink }}" class="photo-link">
-                {{ $image := .Resources.GetMatch "image.*" }}
-                {{ if not $image }}
-                    {{ $image = .Resources.GetMatch "*image*" }}
-                {{ end }}
-                {{ if not $image }}
-                    {{ $image = index (.Resources.ByType "image") 0 }}
-                {{ end }}
-                {{ if $image }}
-                    {{ $thumbnail := $image.Fill "600x750" }}
-                    <img src="{{ $thumbnail.RelPermalink }}" alt="{{ .Title }}" class="photo-thumbnail" loading="lazy">
-                {{ else if .Params.image }}
-                    <img src="{{ .Params.image | relURL }}" alt="{{ .Title }}" class="photo-thumbnail" loading="lazy">
+                {{ if $thumbnailSrc }}
+                    <img src="{{ $thumbnailSrc }}" alt="{{ .Title }}" class="photo-thumbnail" loading="lazy">
                 {{ end }}
                 {{ if .Title }}
                 <div class="photo-overlay">
@@ -32,5 +206,85 @@
         {{ end }}
     </div>
 </div>
+
+<script>
+// Dark mode image switching (uses site's data-theme attribute)
+(function() {
+    function isDarkMode() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    
+    function updateDarkModeImages() {
+        const isDark = isDarkMode();
+        document.querySelectorAll('.photo-item[data-dark-src]').forEach(item => {
+            const img = item.querySelector('.photo-thumbnail');
+            if (!img) return;
+            
+            // Store original src on first run
+            if (!img.dataset.lightSrc) {
+                img.dataset.lightSrc = img.src;
+            }
+            
+            const darkSrc = item.dataset.darkSrc;
+            if (isDark && darkSrc) {
+                img.src = darkSrc;
+            } else {
+                img.src = img.dataset.lightSrc;
+            }
+        });
+    }
+    
+    // Initial update
+    updateDarkModeImages();
+    
+    // Watch for theme changes via MutationObserver on data-theme attribute
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'data-theme') {
+                updateDarkModeImages();
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+})();
+
+// Albums section toggle functionality
+(function() {
+    const albumsToggle = document.getElementById('albumsToggle');
+    const albumsContent = document.getElementById('albumsContent');
+    
+    // Get saved state
+    function getAlbumsExpanded() {
+        return localStorage.getItem('albumsExpanded') === 'true';
+    }
+    
+    // Toggle albums visibility
+    function toggleAlbums(expanded) {
+        if (!albumsContent || !albumsToggle) return;
+        
+        if (expanded) {
+            albumsContent.style.display = 'block';
+            albumsToggle.setAttribute('aria-expanded', 'true');
+            albumsToggle.classList.add('expanded');
+        } else {
+            albumsContent.style.display = 'none';
+            albumsToggle.setAttribute('aria-expanded', 'false');
+            albumsToggle.classList.remove('expanded');
+        }
+        localStorage.setItem('albumsExpanded', expanded.toString());
+    }
+    
+    // Initialize expand state
+    if (albumsToggle && albumsContent) {
+        const initialExpanded = getAlbumsExpanded();
+        toggleAlbums(initialExpanded);
+        
+        albumsToggle.addEventListener('click', function() {
+            const currentExpanded = albumsContent.style.display !== 'none';
+            toggleAlbums(!currentExpanded);
+        });
+    }
+})();
+</script>
 {{ end }}
 

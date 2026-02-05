@@ -14,41 +14,196 @@
         </header>
 
         <main class="main-content">
-            <!-- Management View -->
-            <div id="managementView" class="management-view">
-                <div class="toolbar">
-                    <button id="addPostBtn" class="btn btn-primary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Photos
-                    </button>
-                    <button id="selectModeBtn" class="btn btn-secondary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="9 11 12 14 22 4"></polyline>
-                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                        </svg>
-                        Select
-                    </button>
-                    <button id="deleteSelectedBtn" class="btn btn-danger" style="display: none;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                        Delete Selected (<span id="selectedCount">0</span>)
-                    </button>
-                    <button id="cancelSelectBtn" class="btn btn-secondary" style="display: none;">
-                        Cancel
-                    </button>
-                    <button id="refreshBtn" class="btn btn-secondary">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="23 4 23 10 17 10"></polyline>
-                            <polyline points="1 20 1 14 7 14"></polyline>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                        </svg>
-                        Refresh
-                    </button>
+            <!-- Tab Navigation -->
+            <div class="tabs" id="mainTabs">
+                <button class="tab-btn active" data-tab="photos">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    Photos
+                </button>
+                <button class="tab-btn" data-tab="albums">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Albums
+                </button>
+            </div>
+
+            <!-- Photos Tab Content -->
+            <div id="photosTab" class="tab-content active">
+                <!-- Management View -->
+                <div id="managementView" class="management-view">
+                    <div class="toolbar">
+                        <button id="addPostBtn" class="btn btn-primary">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Photos
+                        </button>
+                        <button id="selectModeBtn" class="btn btn-secondary">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 11 12 14 22 4"></polyline>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                            </svg>
+                            Select
+                        </button>
+                        <button id="addToAlbumBtn" class="btn btn-secondary" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Add to Album
+                        </button>
+                        <button id="bulkEditBtn" class="btn btn-secondary" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            Bulk Edit
+                        </button>
+                        <button id="deleteSelectedBtn" class="btn btn-danger" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            Delete Selected (<span id="selectedCount">0</span>)
+                        </button>
+                        <button id="cancelSelectBtn" class="btn btn-secondary" style="display: none;">
+                            Cancel
+                        </button>
+                        <div class="sort-dropdown" id="sortDropdown">
+                            <button id="sortBtn" class="btn sort-btn" onclick="toggleSortMenu()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="4" y1="6" x2="16" y2="6"></line>
+                                    <line x1="4" y1="12" x2="12" y2="12"></line>
+                                    <line x1="4" y1="18" x2="8" y2="18"></line>
+                                    <polyline points="15 15 18 18 21 15"></polyline>
+                                    <line x1="18" y1="12" x2="18" y2="18"></line>
+                                </svg>
+                                Sort
+                            </button>
+                            <div class="sort-menu" id="sortMenu">
+                                <button class="sort-menu-item active" data-sort="date" data-order="desc" onclick="setSort('date', 'desc')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    Date (Newest)
+                                </button>
+                                <button class="sort-menu-item" data-sort="date" data-order="asc" onclick="setSort('date', 'asc')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                    </svg>
+                                    Date (Oldest)
+                                </button>
+                                <div class="sort-menu-divider"></div>
+                                <button class="sort-menu-item" data-sort="title" data-order="asc" onclick="setSort('title', 'asc')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                        <line x1="9" y1="20" x2="15" y2="20"></line>
+                                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                                    </svg>
+                                    Title (A–Z)
+                                </button>
+                                <button class="sort-menu-item" data-sort="title" data-order="desc" onclick="setSort('title', 'desc')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                        <line x1="9" y1="20" x2="15" y2="20"></line>
+                                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                                    </svg>
+                                    Title (Z–A)
+                                </button>
+                                <div class="sort-menu-divider"></div>
+                                <button class="sort-menu-item" data-sort="gallery" data-order="asc" onclick="setSort('gallery', 'asc')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                    Gallery Order
+                                </button>
+                            </div>
+                        </div>
+                        <button id="refreshBtn" class="btn btn-secondary">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                        <div class="toolbar-spacer"></div>
+                        <button id="galleryOrderBtn" class="btn btn-gallery-order">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Gallery Order
+                        </button>
+                    </div>
+
+                    <!-- Filters Row -->
+                    <div class="filters-row" id="filtersRow">
+                        <div class="filter-group search-filter">
+                            <svg class="filter-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="searchInput" class="filter-input" placeholder="Search title or description...">
+                            <button id="clearSearchBtn" class="clear-filter-btn" style="display: none;" title="Clear search">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="filter-group">
+                            <select id="albumFilter" class="filter-select">
+                                <option value="">All Albums</option>
+                            </select>
+                        </div>
+                        <div class="filter-group date-filter">
+                            <input type="date" id="dateFrom" class="filter-date" title="From date">
+                            <span class="date-separator">–</span>
+                            <input type="date" id="dateTo" class="filter-date" title="To date">
+                            <button id="clearDateBtn" class="clear-filter-btn" style="display: none;" title="Clear date range">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="filter-results" id="filterResults" style="display: none;">
+                            <span id="filterResultsCount">0</span> of <span id="filterResultsTotal">0</span> photos
+                        </div>
+                    </div>
+
+                <div id="galleryOrderHint" class="reorder-hint gallery-order-hint" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Editing <strong>Published Gallery Order</strong> — Drag photos to set how they appear on your site.</span>
+                    <button id="exitGalleryOrderBtn" class="btn btn-sm btn-secondary">Done</button>
                 </div>
 
                 <div id="postsList" class="posts-list">
@@ -72,143 +227,578 @@
                 </div>
 
                 <form id="photoForm" class="upload-form">
-                    <div class="form-group">
-                        <label for="photoInput" class="file-label">
-                            <div class="file-input-wrapper">
-                                <input type="file" id="photoInput" name="photo" accept="image/*,.heic,.heif" multiple>
-                                <div class="file-input-display">
-                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="17 8 12 3 7 8"></polyline>
-                                        <line x1="12" y1="3" x2="12" y2="15"></line>
-                                    </svg>
-                                    <span class="file-input-text" id="fileInputText">Choose photos (you can select multiple)</span>
-                                    <span class="file-input-name" id="fileName"></span>
-                                </div>
-                            </div>
-                        </label>
-                        <div id="previewContainer" class="preview-container" style="display: none;">
-                            <div id="previewGrid" class="preview-grid"></div>
-                        </div>
-                        <div id="currentImageContainer" class="current-image-container" style="display: none;">
-                            <p class="current-image-label">Current image:</p>
-                            <img id="currentImage" src="" alt="Current">
-                        </div>
-                        
-                        <!-- Thumbnail Crop Tool (edit mode only) -->
-                        <div id="cropSection" class="crop-section" style="display: none;">
-                            <p class="crop-section-label">Thumbnail Crop</p>
-                            <p class="crop-section-hint">Drag to position, pinch/scroll to resize. Maintains 4:5 aspect ratio.</p>
-                            <div class="crop-container">
-                                <div id="cropWrapper" class="crop-wrapper">
-                                    <img id="cropImage" src="" alt="Crop source">
-                                    <div id="cropOverlay" class="crop-overlay">
-                                        <div id="cropBox" class="crop-box">
-                                            <div class="crop-handles">
-                                                <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
-                                                <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
-                                                <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
-                                                <div class="crop-handle crop-handle-se" data-handle="se"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="crop-preview-section">
-                                <p class="crop-preview-label">Thumbnail Preview:</p>
-                                <div class="crop-preview-wrapper">
-                                    <canvas id="cropPreview" width="120" height="150"></canvas>
-                                </div>
-                            </div>
-                            <div class="crop-actions">
-                                <button type="button" id="resetCropBtn" class="btn btn-secondary btn-sm">Reset to Full Image</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Dark Mode Image (edit mode only) -->
-                        <div id="darkModeSection" class="dark-mode-section" style="display: none;">
-                            <p class="dark-mode-label">Dark Mode Version (optional)</p>
-                            <p class="dark-mode-hint">Upload an alternate image to show when dark mode is active.</p>
-                            <div class="dark-mode-upload">
-                                <label for="darkModeInput" class="file-label dark-mode-file-label">
-                                    <div class="file-input-wrapper dark-mode-wrapper">
-                                        <input type="file" id="darkModeInput" name="darkModePhoto" accept="image/*,.heic,.heif">
-                                        <div class="file-input-display dark-mode-display">
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    <div class="editor-layout">
+                        <!-- Left Column: Image & Advanced Options -->
+                        <div class="editor-left">
+                            <div class="form-group">
+                                <label for="photoInput" class="file-label">
+                                    <div class="file-input-wrapper">
+                                        <input type="file" id="photoInput" name="photo" accept="image/*,.heic,.heif" multiple>
+                                        <div class="file-input-display">
+                                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                <polyline points="17 8 12 3 7 8"></polyline>
+                                                <line x1="12" y1="3" x2="12" y2="15"></line>
                                             </svg>
-                                            <span class="file-input-text" id="darkModeFileText">Choose dark mode image</span>
+                                            <span class="file-input-text" id="fileInputText">Choose photos</span>
+                                            <span class="file-input-name" id="fileName"></span>
                                         </div>
                                     </div>
                                 </label>
+                                <div id="previewContainer" class="preview-container" style="display: none;">
+                                    <div id="previewGrid" class="preview-grid"></div>
+                                </div>
+                                <div id="currentImageContainer" class="current-image-container" style="display: none;">
+                                    <p class="current-image-label">Current image:</p>
+                                    <img id="currentImage" src="" alt="Current">
+                                </div>
                             </div>
-                            <div id="darkModePreview" class="dark-mode-preview" style="display: none;">
-                                <p class="current-image-label">Current dark mode image:</p>
-                                <img id="darkModeImage" src="" alt="Dark mode">
-                                <button type="button" id="removeDarkModeBtn" class="btn btn-danger btn-sm">Remove Dark Mode Image</button>
+                            
+                            <!-- Thumbnail Crop Tool (collapsible) -->
+                            <div id="cropSection" class="collapsible-section" style="display: none;">
+                                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                                    <span class="collapsible-title">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                                        </svg>
+                                        Thumbnail Crop
+                                    </span>
+                                    <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="collapsible-body">
+                                    <p class="crop-section-hint">Drag to position. Maintains 4:5 ratio.</p>
+                                    <div class="crop-container">
+                                        <div id="cropWrapper" class="crop-wrapper">
+                                            <img id="cropImage" src="" alt="Crop source">
+                                            <div id="cropOverlay" class="crop-overlay">
+                                                <div id="cropBox" class="crop-box">
+                                                    <div class="crop-handles">
+                                                        <div class="crop-handle crop-handle-nw" data-handle="nw"></div>
+                                                        <div class="crop-handle crop-handle-ne" data-handle="ne"></div>
+                                                        <div class="crop-handle crop-handle-sw" data-handle="sw"></div>
+                                                        <div class="crop-handle crop-handle-se" data-handle="se"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="crop-preview-section">
+                                        <p class="crop-preview-label">Preview:</p>
+                                        <div class="crop-preview-wrapper">
+                                            <canvas id="cropPreview" width="80" height="100"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="crop-actions">
+                                        <button type="button" id="resetCropBtn" class="btn btn-secondary btn-sm">Reset</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Frame Options (collapsible) -->
+                            <div id="frameSection" class="collapsible-section" style="display: none;">
+                                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                                    <span class="collapsible-title">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        </svg>
+                                        Frame Options
+                                    </span>
+                                    <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="collapsible-body">
+                                    <div class="frame-preview-container">
+                                        <div id="framePreview" class="frame-preview">
+                                            <img id="framePreviewImage" src="" alt="Frame preview">
+                                        </div>
+                                    </div>
+                                    <div class="frame-control-group">
+                                        <label class="frame-control-label">Type</label>
+                                        <div class="frame-type-options" id="frameTypeOptions">
+                                            <button type="button" class="frame-type-btn active" data-type="none">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                            <button type="button" class="frame-type-btn" data-type="even">Even</button>
+                                            <button type="button" class="frame-type-btn" data-type="1:1">1:1</button>
+                                            <button type="button" class="frame-type-btn" data-type="4:5">4:5</button>
+                                            <button type="button" class="frame-type-btn" data-type="5:4">5:4</button>
+                                            <button type="button" class="frame-type-btn" data-type="9:16">9:16</button>
+                                        </div>
+                                    </div>
+                                    <div class="frame-control-group" id="insetWidthGroup" style="display: none;">
+                                        <label class="frame-control-label">Inset</label>
+                                        <div class="frame-slider-container">
+                                            <input type="range" id="insetWidthSlider" min="0" max="100" value="10" class="frame-slider">
+                                            <span id="insetWidthValue" class="frame-slider-value">10%</span>
+                                        </div>
+                                    </div>
+                                    <div class="frame-control-group" id="frameColorGroup" style="display: none;">
+                                        <label class="frame-control-label">Color</label>
+                                        <div class="frame-color-options" id="frameColorOptions">
+                                            <button type="button" class="frame-color-btn active" data-color="#FFFFFF" title="White" style="background-color: #FFFFFF;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#F5F5F5" title="Snow" style="background-color: #F5F5F5;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#E8E4DF" title="Cream" style="background-color: #E8E4DF;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#D4CFC9" title="Warm Gray" style="background-color: #D4CFC9;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#9E9E9E" title="Gray" style="background-color: #9E9E9E;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#616161" title="Dark Gray" style="background-color: #616161;"></button>
+                                            <button type="button" class="frame-color-btn" data-color="#000000" title="Black" style="background-color: #000000;"></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Dark Mode Image (collapsible) -->
+                            <div id="darkModeSection" class="collapsible-section dark-theme" style="display: none;">
+                                <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+                                    <span class="collapsible-title">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                        </svg>
+                                        Dark Mode Image
+                                    </span>
+                                    <svg class="collapsible-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="collapsible-body">
+                                    <div class="dark-mode-upload">
+                                        <label for="darkModeInput" class="file-label dark-mode-file-label">
+                                            <div class="file-input-wrapper dark-mode-wrapper">
+                                                <input type="file" id="darkModeInput" name="darkModePhoto" accept="image/*,.heic,.heif">
+                                                <div class="file-input-display dark-mode-display">
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                                                    </svg>
+                                                    <span class="file-input-text" id="darkModeFileText">Choose dark mode image</span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div id="darkModePreview" class="dark-mode-preview" style="display: none;">
+                                        <p class="current-image-label">Current:</p>
+                                        <img id="darkModeImage" src="" alt="Dark mode">
+                                        <button type="button" id="removeDarkModeBtn" class="btn btn-danger btn-sm">Remove</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Batch upload info - shown when multiple files selected -->
-                    <div id="batchInfo" class="batch-info" style="display: none;">
-                        <p><strong><span id="batchCount">0</span> photos selected</strong> - Each will be created as a separate post</p>
-                    </div>
+                        
+                        <!-- Right Column: Metadata -->
+                        <div class="editor-right">
+                            <!-- Batch upload info -->
+                            <div id="batchInfo" class="batch-info" style="display: none;">
+                                <p><strong><span id="batchCount">0</span> photos</strong> - Each creates a separate post</p>
+                            </div>
 
-                    <div class="form-group">
-                        <label for="titleInput">Title (optional)</label>
-                        <input type="text" id="titleInput" name="title" placeholder="Enter photo title (leave blank to use date)">
-                        <small class="form-hint">For batch uploads, each photo will use this title or be auto-named</small>
-                    </div>
+                            <div class="form-group">
+                                <label for="titleInput">Title</label>
+                                <input type="text" id="titleInput" name="title" placeholder="Photo title (optional)">
+                            </div>
 
-                    <div class="form-group">
-                        <label for="descriptionInput">Description</label>
-                        <textarea id="descriptionInput" name="description" rows="4" placeholder="Enter photo description (optional)"></textarea>
-                    </div>
+                            <div class="form-group">
+                                <label for="descriptionInput">Description</label>
+                                <textarea id="descriptionInput" name="description" rows="3" placeholder="Description (optional)"></textarea>
+                            </div>
 
-                    <div class="form-group">
-                        <label for="tagsInput">Tags</label>
-                        <input type="text" id="tagsInput" name="tags" placeholder="Enter tags separated by commas (e.g. nature, landscape, travel)">
-                        <small class="form-hint">Separate multiple tags with commas</small>
-                    </div>
+                            <div class="form-group">
+                                <label for="tagsInput">Tags</label>
+                                <input type="text" id="tagsInput" name="tags" placeholder="nature, landscape, travel">
+                                <small class="form-hint">Comma separated</small>
+                            </div>
 
-                    <div class="form-group" id="draftGroup" style="display: none;">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="draftInput" name="draft">
-                            <span>Save as draft</span>
-                        </label>
-                    </div>
+                            <div class="form-group" id="photoDateGroup" style="display: none;">
+                                <label for="photoDateInput">Photo Date</label>
+                                <input type="date" id="photoDateInput" name="photoDate">
+                                <small class="form-hint">When the photo was taken (optional)</small>
+                            </div>
 
-                    <div class="form-actions">
-                        <button type="submit" class="submit-btn" id="submitBtn">
-                            <span class="btn-text" id="submitBtnText">Upload & Create Post</span>
-                            <span class="btn-loader" style="display: none;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <button type="button" id="deleteBtn" class="btn btn-danger" style="display: none;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                            Delete Post
-                        </button>
-                    </div>
-                    
-                    <!-- Progress bar for batch uploads -->
-                    <div id="uploadProgress" class="upload-progress" style="display: none;">
-                        <div class="progress-bar">
-                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                            <div class="form-group" id="cameraGroup" style="display: none;">
+                                <label for="cameraInput">Camera</label>
+                                <input type="text" id="cameraInput" name="camera" placeholder="e.g. Sony A7IV, iPhone 15 Pro">
+                                <small class="form-hint">Camera used (optional)</small>
+                            </div>
+
+                            <div class="form-group" id="locationGroup" style="display: none;">
+                                <label for="locationSearch">Location</label>
+                                <div class="location-picker">
+                                    <div class="location-search-wrapper">
+                                        <input type="text" id="locationSearch" placeholder="Search for a location..." autocomplete="off">
+                                        <div id="locationResults" class="location-results" style="display: none;"></div>
+                                    </div>
+                                    <div id="selectedLocation" class="selected-location" style="display: none;">
+                                        <span id="selectedLocationName"></span>
+                                        <button type="button" id="clearLocationBtn" class="clear-location-btn" title="Clear location">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="form-hint">Search using OpenStreetMap (optional)</small>
+                            </div>
+
+                            <div class="form-group" id="draftGroup" style="display: none;">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="draftInput" name="draft">
+                                    <span>Save as draft</span>
+                                </label>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="submit-btn" id="submitBtn">
+                                    <span class="btn-text" id="submitBtnText">Upload</span>
+                                    <span class="btn-loader" style="display: none;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                        </svg>
+                                    </span>
+                                </button>
+                                <button type="button" id="deleteBtn" class="btn btn-danger" style="display: none;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
+                            
+                            <!-- Progress bar for batch uploads -->
+                            <div id="uploadProgress" class="upload-progress" style="display: none;">
+                                <div class="progress-bar">
+                                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                                </div>
+                                <p id="progressText" class="progress-text">Uploading 0 of 0...</p>
+                            </div>
+
+                            <div id="message" class="message" style="display: none;"></div>
                         </div>
-                        <p id="progressText" class="progress-text">Uploading 0 of 0...</p>
                     </div>
+                </form>
+            </div>
+            </div> <!-- End photosTab -->
 
-                    <div id="message" class="message" style="display: none;"></div>
+            <!-- Albums Tab Content -->
+            <div id="albumsTab" class="tab-content">
+                <div class="toolbar">
+                    <button id="createAlbumBtn" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Create Album
+                    </button>
+                    <button id="refreshAlbumsBtn" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+                
+                <div id="albumsList" class="albums-grid">
+                    <div class="loading">Loading albums...</div>
+                </div>
+                
+                <div id="albumsMessage" class="message" style="display: none;"></div>
+            </div>
+
+            <!-- Album Edit View -->
+            <div id="albumEditView" class="album-edit-view" style="display: none;">
+                <div class="form-header">
+                    <h2 id="albumFormTitle">Create Album</h2>
+                    <button id="backToAlbumsBtn" class="btn btn-secondary">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        Back to Albums
+                    </button>
+                </div>
+                
+                <form id="albumForm" class="upload-form">
+                    <div class="editor-layout">
+                        <!-- Left Column: Photos -->
+                        <div class="editor-left">
+                            <!-- Album photos section -->
+                            <div class="form-group" id="albumPhotosSection" style="display: none;">
+                                <label>Photos (<span id="albumPhotoCount">0</span>)</label>
+                                <div id="albumPhotosGrid" class="album-photos-grid"></div>
+                                <button type="button" id="addPhotosToAlbumBtn" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Add Photos
+                                </button>
+                            </div>
+                            
+                            <!-- Thumbnail settings (only shown in edit mode with photos) -->
+                            <div class="form-group" id="thumbnailSection" style="display: none;">
+                                <label>Thumbnail</label>
+                                <div class="thumbnail-settings">
+                                    <div class="thumbnail-preview-area">
+                                        <div id="thumbnailPreview" class="thumbnail-preview">
+                                            <span class="thumbnail-preview-empty">Select</span>
+                                        </div>
+                                    </div>
+                                    <div class="thumbnail-right">
+                                        <div class="thumbnail-options">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="stackedPreviewInput" checked>
+                                                <span>Stacked preview</span>
+                                            </label>
+                                        </div>
+                                        <div class="thumbnail-selector">
+                                            <label class="thumbnail-selector-label">Choose thumbnail:</label>
+                                            <div id="thumbnailPhotoOptions" class="thumbnail-photo-options"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Column: Metadata -->
+                        <div class="editor-right">
+                            <div class="form-group">
+                                <label for="albumNameInput">Album Name *</label>
+                                <input type="text" id="albumNameInput" name="name" placeholder="Album name" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="albumDescInput">Description</label>
+                                <textarea id="albumDescInput" name="description" rows="2" placeholder="Description (optional)"></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Layout</label>
+                                <div class="layout-options" id="layoutOptions">
+                                    <button type="button" class="layout-option active" data-layout="horizontal">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="2" y="6" width="5" height="12" rx="1"></rect>
+                                            <rect x="9" y="6" width="5" height="12" rx="1"></rect>
+                                            <rect x="16" y="6" width="5" height="12" rx="1"></rect>
+                                        </svg>
+                                        <span>Horizontal</span>
+                                    </button>
+                                    <button type="button" class="layout-option" data-layout="vertical">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="4" y="2" width="16" height="6" rx="1"></rect>
+                                            <rect x="4" y="10" width="16" height="6" rx="1"></rect>
+                                            <rect x="4" y="18" width="16" height="4" rx="1"></rect>
+                                        </svg>
+                                        <span>Vertical</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group" id="bgColorSection">
+                                <label>Background Color <span class="form-hint-inline">(optional)</span></label>
+                                <div class="bg-color-row">
+                                    <span class="bg-color-label">Light:</span>
+                                    <div class="bg-color-options" id="bgColorOptions">
+                                        <button type="button" class="bg-color-btn active" data-color="" title="None">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="bg-color-btn" data-color="#FFFFFF" title="White" style="background-color: #FFFFFF;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#F5F5F5" title="Snow" style="background-color: #F5F5F5;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#E8E4DF" title="Cream" style="background-color: #E8E4DF;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#D4CFC9" title="Warm Gray" style="background-color: #D4CFC9;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#9E9E9E" title="Gray" style="background-color: #9E9E9E;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#616161" title="Dark Gray" style="background-color: #616161;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#000000" title="Black" style="background-color: #000000;"></button>
+                                    </div>
+                                </div>
+                                <div class="bg-color-row" id="bgColorDarkRow" style="display: none;">
+                                    <span class="bg-color-label">Dark:</span>
+                                    <div class="bg-color-options" id="bgColorDarkOptions">
+                                        <button type="button" class="bg-color-btn active" data-color="" title="Same as light">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                        <button type="button" class="bg-color-btn" data-color="#FFFFFF" title="White" style="background-color: #FFFFFF;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#F5F5F5" title="Snow" style="background-color: #F5F5F5;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#2A2A2A" title="Dark" style="background-color: #2A2A2A;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#1A1A1A" title="Very Dark" style="background-color: #1A1A1A;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#333333" title="Charcoal" style="background-color: #333333;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#616161" title="Dark Gray" style="background-color: #616161;"></button>
+                                        <button type="button" class="bg-color-btn" data-color="#000000" title="Black" style="background-color: #000000;"></button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="submit-btn" id="albumSubmitBtn">
+                                    <span class="btn-text" id="albumSubmitBtnText">Create Album</span>
+                                    <span class="btn-loader" style="display: none;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                        </svg>
+                                    </span>
+                                </button>
+                                <button type="button" id="deleteAlbumBtn" class="btn btn-danger" style="display: none;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
+                            
+                            <div id="albumFormMessage" class="message" style="display: none;"></div>
+                        </div>
+                    </div>
                 </form>
             </div>
         </main>
+    </div>
+
+    <!-- Photo Selection Modal for Albums -->
+    <div id="photoSelectModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="photoSelectTitle">Select Photos</h3>
+                <button type="button" id="closePhotoSelectBtn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalPhotosList" class="modal-photos-grid"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelPhotoSelectBtn" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="confirmPhotoSelectBtn" class="btn btn-primary">Add Selected (<span id="modalSelectedCount">0</span>)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Album Selection Modal -->
+    <div id="albumSelectModal" class="modal" style="display: none;">
+        <div class="modal-content modal-content-sm">
+            <div class="modal-header">
+                <h3>Add to Album</h3>
+                <button type="button" id="closeAlbumSelectBtn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="albumSelectList" class="album-select-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelAlbumSelectBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Edit Modal -->
+    <div id="bulkEditModal" class="modal" style="display: none;">
+        <div class="modal-content modal-content-md">
+            <div class="modal-header">
+                <h3>Bulk Edit <span id="bulkEditCount">0</span> Photos</h3>
+                <button type="button" id="closeBulkEditBtn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="bulk-edit-hint">Only fill in fields you want to change. Empty fields will be left unchanged.</p>
+                
+                <div class="form-group">
+                    <label for="bulkTitleInput">Title</label>
+                    <input type="text" id="bulkTitleInput" placeholder="Set title for all selected photos">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkDescriptionInput">Description</label>
+                    <textarea id="bulkDescriptionInput" rows="2" placeholder="Set description for all selected photos"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkPhotoDateInput">Photo Date</label>
+                    <input type="date" id="bulkPhotoDateInput">
+                    <small class="form-hint">When the photos were taken</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkCameraInput">Camera</label>
+                    <input type="text" id="bulkCameraInput" placeholder="e.g. Sony A7IV, iPhone 15 Pro">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkLocationSearch">Location</label>
+                    <div class="location-picker">
+                        <div class="location-search-wrapper">
+                            <input type="text" id="bulkLocationSearch" placeholder="Search for a location..." autocomplete="off">
+                            <div id="bulkLocationResults" class="location-results" style="display: none;"></div>
+                        </div>
+                        <div id="bulkSelectedLocation" class="selected-location" style="display: none;">
+                            <span id="bulkSelectedLocationName"></span>
+                            <button type="button" id="clearBulkLocationBtn" class="clear-location-btn" title="Clear location">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <small class="form-hint">Search using OpenStreetMap</small>
+                </div>
+                
+                <!-- Frame Options -->
+                <div class="form-group bulk-frame-section">
+                    <label>Frame Options</label>
+                    <div class="frame-control-group">
+                        <label class="frame-control-label">Type</label>
+                        <div class="frame-type-options" id="bulkFrameTypeOptions">
+                            <button type="button" class="frame-type-btn" data-type="">
+                                <span style="font-size: 10px;">No Change</span>
+                            </button>
+                            <button type="button" class="frame-type-btn" data-type="none">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                            <button type="button" class="frame-type-btn" data-type="even">Even</button>
+                            <button type="button" class="frame-type-btn" data-type="1:1">1:1</button>
+                            <button type="button" class="frame-type-btn" data-type="4:5">4:5</button>
+                            <button type="button" class="frame-type-btn" data-type="5:4">5:4</button>
+                            <button type="button" class="frame-type-btn" data-type="9:16">9:16</button>
+                        </div>
+                    </div>
+                    <div class="frame-control-group" id="bulkInsetWidthGroup" style="display: none;">
+                        <label class="frame-control-label">Inset</label>
+                        <div class="frame-slider-container">
+                            <input type="range" id="bulkInsetWidthSlider" min="0" max="100" value="10" class="frame-slider">
+                            <span id="bulkInsetWidthValue" class="frame-slider-value">10%</span>
+                        </div>
+                    </div>
+                    <div class="frame-control-group" id="bulkFrameColorGroup" style="display: none;">
+                        <label class="frame-control-label">Color</label>
+                        <div class="frame-color-options" id="bulkFrameColorOptions">
+                            <button type="button" class="frame-color-btn active" data-color="#FFFFFF" title="White" style="background-color: #FFFFFF;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#F5F5F5" title="Snow" style="background-color: #F5F5F5;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#E8E4DF" title="Cream" style="background-color: #E8E4DF;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#D4CFC9" title="Warm Gray" style="background-color: #D4CFC9;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#9E9E9E" title="Gray" style="background-color: #9E9E9E;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#616161" title="Dark Gray" style="background-color: #616161;"></button>
+                            <button type="button" class="frame-color-btn" data-color="#000000" title="Black" style="background-color: #000000;"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelBulkEditBtn" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="applyBulkEditBtn" class="btn btn-primary">Apply Changes</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

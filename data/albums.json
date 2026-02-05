@@ -1,0 +1,78 @@
+{
+  "albums": [
+    {
+      "id": "ml8rymcwotirh",
+      "name": "by the sea",
+      "description": "2024.09.30 - shot on iPhone",
+      "photoSlugs": [
+        "2026-02-05T01-23-57-ml8rwk6qzjdp",
+        "2026-02-05T01-17-51",
+        "2026-02-05T01-23-59-ml8rwlqjya80"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "2026-02-05T01-17-51",
+      "stackedPreview": true,
+      "createdAt": "2026-02-05T01:25:33.488Z",
+      "updatedAt": "2026-02-05T01:47:44.697Z",
+      "bgColor": "#FFFFFF",
+      "bgColorDark": "#FFFFFF"
+    },
+    {
+      "id": "ml8swz1e0uqj8",
+      "name": "at the gardens",
+      "description": "2018.04.21",
+      "photoSlugs": [
+        "2026-02-05T01-23-46-ml8rwbui7030",
+        "2026-02-05T01-23-43-ml8rw9dr4o76",
+        "2026-02-05T01-23-38-ml8rw5l2z49p",
+        "2026-02-05T01-23-40-ml8rw76li12a",
+        "2026-02-05T01-23-39-ml8rw6a1ec1k"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "2026-02-05T01-23-46-ml8rwbui7030",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-02-05T01:52:16.227Z",
+      "updatedAt": "2026-02-05T01:52:35.012Z"
+    },
+    {
+      "id": "ml8t56ddbxisn",
+      "name": "Cape Town beach goers",
+      "description": "",
+      "photoSlugs": [
+        "2026-02-05T01-23-48-ml8rwd069l5d",
+        "2026-02-05T01-23-49-ml8rwdub8363",
+        "2026-02-05T01-23-41-ml8rw89tor78",
+        "2026-02-05T01-23-41-ml8rw7uujly9"
+      ],
+      "layout": "vertical",
+      "thumbnailSlug": "2026-02-05T01-23-49-ml8rwdub8363",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-02-05T01:58:38.977Z",
+      "updatedAt": "2026-02-05T01:59:02.652Z"
+    },
+    {
+      "id": "ml8u32b9lmcph",
+      "name": "Roshko",
+      "description": "",
+      "photoSlugs": [
+        "2026-02-05T01-23-50-ml8rwewa6e8r",
+        "2026-02-05T01-24-03-ml8rwotqclqt",
+        "2026-02-05T01-23-37-ml8rw4m1i1w2",
+        "2026-02-05T01-23-53-ml8rwh4pvsr4",
+        "2026-02-05T01-23-51-ml8rwg0j9xqh",
+        "2026-02-05T01-23-55-ml8rwidh0pwt"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "2026-02-05T01-23-50-ml8rwewa6e8r",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-02-05T02:25:00.021Z",
+      "updatedAt": "2026-02-05T02:25:27.329Z"
+    }
+  ]
+}
