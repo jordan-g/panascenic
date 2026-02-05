@@ -6,6 +6,9 @@
     <title>{{ block "title" . }}{{ with .Params.Title }}{{ . }} | {{ end }}{{ .Site.Title }}{{ end }}</title>
     <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{if .IsPage}}{{ .Summary }}{{ else }}{{ with .Site.Params.description }}{{ . }}{{ end }}{{ end }}{{ end }}">
     {{ hugo.Generator }}
+    <!-- Preload critical fonts to reduce FOUT -->
+    <link rel="preload" href="{{ "fonts/KometProTRIAL-Light.otf" | relURL }}" as="font" type="font/opentype" crossorigin>
+    <link rel="preload" href="{{ "fonts/Jazzier_Trial_Rg.ttf" | relURL }}" as="font" type="font/truetype" crossorigin>
     <link rel="stylesheet" href="{{ "css/photography.css" | relURL }}">
     {{ block "head" . }}{{ end }}
 </head>
