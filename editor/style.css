@@ -879,6 +879,8 @@ textarea {
 /* Selection mode */
 .post-card.selectable {
     cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .post-card.selectable:hover {
@@ -1384,6 +1386,58 @@ textarea {
     margin-bottom: 0.5rem;
 }
 
+/* Crop Aspect Ratio Controls */
+.crop-control-group {
+    margin-bottom: 0.6rem;
+}
+
+.crop-control-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #5a6c7d;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.crop-aspect-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.crop-aspect-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.5rem;
+    min-width: 38px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    font-size: 0.7rem;
+    color: #666;
+}
+
+.crop-aspect-btn:hover {
+    border-color: #3498db;
+    background: #f0f8ff;
+}
+
+.crop-aspect-btn.active {
+    border-color: #3498db;
+    background: #3498db;
+    color: white;
+}
+
+.crop-aspect-btn.active svg {
+    stroke: white;
+}
+
 .crop-container {
     display: flex;
     flex-direction: column;
@@ -1665,22 +1719,17 @@ textarea {
 }
 
 .frame-preview {
-    max-width: 180px;
-    max-height: 180px;
-    border-radius: 6px;
-    overflow: hidden;
+    max-width: 200px;
     transition: all 0.3s ease;
     background: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-block;
+    box-sizing: border-box;
 }
 
 .frame-preview img {
     display: block;
     max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+    height: auto;
     transition: all 0.3s ease;
 }
 
@@ -1845,7 +1894,6 @@ textarea {
 
     .frame-preview {
         max-width: 250px;
-        max-height: 250px;
     }
 }
 

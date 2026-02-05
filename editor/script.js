@@ -54,6 +54,8 @@ const cropImage = document.getElementById('cropImage');
 const cropBox = document.getElementById('cropBox');
 const cropPreview = document.getElementById('cropPreview');
 const resetCropBtn = document.getElementById('resetCropBtn');
+const cropAspectOptions = document.getElementById('cropAspectOptions');
+const cropHint = document.getElementById('cropHint');
 const darkModeSection = document.getElementById('darkModeSection');
 const darkModeInput = document.getElementById('darkModeInput');
 const darkModeFileText = document.getElementById('darkModeFileText');
@@ -77,9 +79,11 @@ let currentEditingSlug = null;
 let isEditMode = false;
 let isSelectMode = false;
 let selectedPosts = new Set();
+let lastSelectedIndex = null; // Track last selected index for shift-click range selection
 let currentPosts = []; // Store loaded posts for sorting
 let filteredPosts = []; // Posts after filtering
-let currentSort = { field: 'date', order: 'desc' };
+let displayedPosts = []; // Posts in actual display order (filtered + sorted)
+let currentSort = { field: 'gallery', order: 'asc' }; // Default to gallery order
 let galleryOrder = []; // Order for the published gallery
 let isGalleryOrderMode = false; // Whether we're editing gallery order
 let currentLocation = null; // Current selected location { name, lat, lng }
@@ -116,7 +120,23 @@ let cropData = {
     startCropX: 0, startCropY: 0,
     startCropW: 0, startCropH: 0
 };
-const ASPECT_RATIO = 4 / 5; // 600x750 thumbnail
+
+// Crop aspect ratio (default 4:5, can be changed by user)
+let cropAspectMode = '4:5'; // '1:1', '4:5', '3:4', '9:16', '16:9', 'original', 'free'
+
+// Get current aspect ratio value based on mode
+function getCropAspectRatio() {
+    if (cropAspectMode === 'free') return null; // Freeform - no constraint
+    if (cropAspectMode === 'original') {
+        return cropData.imageWidth / cropData.imageHeight;
+    }
+    // Parse ratio string like "4:5"
+    const parts = cropAspectMode.split(':');
+    if (parts.length === 2) {
+        return parseInt(parts[0]) / parseInt(parts[1]);
+    }
+    return 4 / 5; // Default fallback
+}
 
 // Frame state
 let frameData = {
@@ -281,6 +301,20 @@ async function loadPosts() {
             await loadAlbumsForFilter();
         }
         
+        // Load gallery order if sorting by gallery and not loaded yet
+        if (currentSort.field === 'gallery' && galleryOrder.length === 0) {
+            await loadGalleryOrder();
+            // Initialize with current posts if still empty (sort by date for default order)
+            if (galleryOrder.length === 0 && currentPosts.length > 0) {
+                const sorted = [...currentPosts].sort((a, b) => {
+                    const dateA = new Date(a.date || 0).getTime();
+                    const dateB = new Date(b.date || 0).getTime();
+                    return dateB - dateA; // newest first
+                });
+                galleryOrder = sorted.map(p => p.slug);
+            }
+        }
+        
         // Apply filters and render
         applyFiltersAndRender();
         
@@ -387,8 +421,8 @@ function filterPosts(posts) {
 // Apply filters and render
 function applyFiltersAndRender() {
     filteredPosts = filterPosts(currentPosts);
-    const sorted = sortPosts(filteredPosts);
-    renderPosts(sorted);
+    displayedPosts = sortPosts(filteredPosts); // Store the actual display order
+    renderPosts(displayedPosts);
     updateFilterResultsDisplay();
 }
 
@@ -647,7 +681,8 @@ async function enterGalleryOrderMode() {
     if (selectModeBtn) selectModeBtn.style.display = 'none';
     
     // Re-render ALL posts in gallery order (ignoring filters)
-    renderPosts(sortPosts(currentPosts));
+    displayedPosts = sortPosts(currentPosts);
+    renderPosts(displayedPosts);
 }
 
 // Exit gallery order editing mode
@@ -706,7 +741,8 @@ function renderPosts(posts) {
         <div class="post-card ${isSelectMode ? 'selectable' : ''} ${selectedPosts.has(post.slug) ? 'selected' : ''} ${isGalleryOrderMode ? 'reorderable' : ''}" 
              data-slug="${post.slug}" 
              data-index="${index}"
-             ${isGalleryOrderMode && !isSelectMode ? 'draggable="true"' : ''}>
+             ${isGalleryOrderMode && !isSelectMode ? 'draggable="true"' : ''}
+             ${isSelectMode ? `onclick="handlePostRowClick(event, '${post.slug}', ${index})"` : ''}>
             ${isGalleryOrderMode && !isSelectMode ? `
                 <div class="post-drag-handle" title="Drag to reorder">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -722,13 +758,13 @@ function renderPosts(posts) {
             ` : ''}
             ${isSelectMode ? `
                 <div class="post-checkbox">
-                    <input type="checkbox" ${selectedPosts.has(post.slug) ? 'checked' : ''} onchange="togglePostSelection('${post.slug}', this.checked)">
+                    <input type="checkbox" ${selectedPosts.has(post.slug) ? 'checked' : ''}>
                 </div>
             ` : ''}
-            <div class="post-image" onclick="${isSelectMode ? `togglePostSelection('${post.slug}')` : (isGalleryOrderMode ? '' : `editPost('${post.slug}')`)}">
+            <div class="post-image" onclick="${!isSelectMode ? (isGalleryOrderMode ? '' : `editPost('${post.slug}')`) : ''}">
                 ${post.image ? `<img src="${post.image}" alt="${post.title || 'Untitled'}" onerror="this.style.display='none'">` : '<div class="no-image">No Image</div>'}
             </div>
-            <div class="post-content ${isSelectMode || isGalleryOrderMode ? '' : 'editable'}" ${isSelectMode ? `onclick="togglePostSelection('${post.slug}')"` : ''}>
+            <div class="post-content ${isSelectMode || isGalleryOrderMode ? '' : 'editable'}">
                 ${isSelectMode || isGalleryOrderMode ? `
                     <h3 class="post-title">${escapeHtml(post.title || 'Untitled')}</h3>
                     <p class="post-description">${escapeHtml(post.description || 'No description')}</p>
@@ -864,7 +900,8 @@ function handlePostDrop(e) {
         saveGalleryOrder();
         
         // Re-render
-        renderPosts(sortPosts(currentPosts));
+        displayedPosts = sortPosts(currentPosts);
+        renderPosts(displayedPosts);
         
         // Show feedback
         showListMessage('Gallery order updated', 'success');
@@ -1028,6 +1065,7 @@ function enterSelectMode() {
     
     isSelectMode = true;
     selectedPosts.clear();
+    lastSelectedIndex = null; // Reset for shift-click range selection
     updateSelectedCount();
     selectModeBtn.style.display = 'none';
     addPostBtn.style.display = 'none';
@@ -1044,6 +1082,7 @@ function enterSelectMode() {
 function exitSelectMode() {
     isSelectMode = false;
     selectedPosts.clear();
+    lastSelectedIndex = null; // Reset for shift-click range selection
     selectModeBtn.style.display = 'inline-flex';
     addPostBtn.style.display = 'inline-flex';
     deleteSelectedBtn.style.display = 'none';
@@ -1081,6 +1120,58 @@ function togglePostSelection(slug, forceState) {
         }
     }
 }
+
+// Handle click on post row in select mode (supports shift+click for range selection)
+function handlePostRowClick(event, slug, index) {
+    // Prevent text selection on shift+click
+    if (event.shiftKey) {
+        event.preventDefault();
+        window.getSelection()?.removeAllRanges();
+    }
+    
+    // Prevent double-triggering if clicking on the checkbox itself
+    if (event.target.type === 'checkbox') {
+        // Let the checkbox handle it directly
+        togglePostSelection(slug, event.target.checked);
+        lastSelectedIndex = index;
+        return;
+    }
+    
+    // Handle shift+click for range selection
+    if (event.shiftKey && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index);
+        const end = Math.max(lastSelectedIndex, index);
+        
+        // Select all posts in the range using displayedPosts (which is in actual display order)
+        for (let i = start; i <= end; i++) {
+            if (displayedPosts[i]) {
+                selectedPosts.add(displayedPosts[i].slug);
+            }
+        }
+        
+        // Update visual state for all cards in range
+        for (let i = start; i <= end; i++) {
+            if (displayedPosts[i]) {
+                const card = document.querySelector(`.post-card[data-slug="${displayedPosts[i].slug}"]`);
+                if (card) {
+                    card.classList.add('selected');
+                    const checkbox = card.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                }
+            }
+        }
+        
+        updateSelectedCount();
+    } else {
+        // Normal click - toggle selection
+        togglePostSelection(slug);
+        lastSelectedIndex = index;
+    }
+}
+
+window.handlePostRowClick = handlePostRowClick;
 
 function updateSelectedCount() {
     selectedCountSpan.textContent = selectedPosts.size;
@@ -1396,13 +1487,14 @@ async function updatePost() {
     formData.append('camera', cameraInput.value.trim());
     formData.append('location', currentLocation ? JSON.stringify(currentLocation) : '');
     
-    // Add crop data (normalized coordinates)
+    // Add crop data (normalized coordinates + aspect mode)
     if (cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
         formData.append('thumbnailCrop', JSON.stringify({
             x: cropData.x,
             y: cropData.y,
             width: cropData.width,
-            height: cropData.height
+            height: cropData.height,
+            aspect: cropAspectMode
         }));
     }
     
@@ -1528,6 +1620,17 @@ function initCropTool(imageSrc, existingCrop = null) {
         cropData.imageWidth = cropImage.naturalWidth;
         cropData.imageHeight = cropImage.naturalHeight;
         
+        // Load aspect ratio from saved data or default to 4:5
+        if (existingCrop && existingCrop.aspect) {
+            cropAspectMode = existingCrop.aspect;
+        } else {
+            cropAspectMode = '4:5';
+        }
+        
+        // Update UI to reflect aspect mode
+        updateCropAspectUI();
+        updateCropHint();
+        
         if (existingCrop && existingCrop.width > 0 && existingCrop.height > 0) {
             // Use existing crop data (normalized)
             cropData.x = existingCrop.x;
@@ -1545,19 +1648,35 @@ function initCropTool(imageSrc, existingCrop = null) {
     cropImage.src = imageSrc;
 }
 
+function updateCropAspectUI() {
+    cropAspectOptions.querySelectorAll('.crop-aspect-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.aspect === cropAspectMode);
+    });
+}
+
 function resetCropToDefault() {
     const imgAspect = cropData.imageWidth / cropData.imageHeight;
+    const targetAspect = getCropAspectRatio();
     
-    if (imgAspect > ASPECT_RATIO) {
+    // Freeform mode - use full image
+    if (targetAspect === null) {
+        cropData.x = 0;
+        cropData.y = 0;
+        cropData.width = 1;
+        cropData.height = 1;
+        return;
+    }
+    
+    if (imgAspect > targetAspect) {
         // Image is wider than target - fit to height
         cropData.height = 1;
-        cropData.width = (cropData.imageHeight * ASPECT_RATIO) / cropData.imageWidth;
+        cropData.width = (cropData.imageHeight * targetAspect) / cropData.imageWidth;
         cropData.y = 0;
         cropData.x = (1 - cropData.width) / 2;
     } else {
         // Image is taller than target - fit to width
         cropData.width = 1;
-        cropData.height = (cropData.imageWidth / ASPECT_RATIO) / cropData.imageHeight;
+        cropData.height = (cropData.imageWidth / targetAspect) / cropData.imageHeight;
         cropData.x = 0;
         cropData.y = (1 - cropData.height) / 2;
     }
@@ -1592,16 +1711,39 @@ function updateCropPreview() {
     const sw = cropData.width * cropData.imageWidth;
     const sh = cropData.height * cropData.imageHeight;
     
+    // Calculate preview dimensions based on actual crop aspect
+    const cropAspect = sw / sh;
+    const maxSize = 300;
+    let previewW, previewH;
+    
+    if (cropAspect > 1) {
+        // Wider than tall
+        previewW = maxSize;
+        previewH = maxSize / cropAspect;
+    } else {
+        // Taller than wide
+        previewH = maxSize;
+        previewW = maxSize * cropAspect;
+    }
+    
+    // Update canvas size
+    cropPreview.width = Math.round(previewW);
+    cropPreview.height = Math.round(previewH);
+    
     // Clear and draw
-    ctx.clearRect(0, 0, 120, 150);
-    ctx.drawImage(cropImage, sx, sy, sw, sh, 0, 0, 120, 150);
+    ctx.clearRect(0, 0, previewW, previewH);
+    ctx.drawImage(cropImage, sx, sy, sw, sh, 0, 0, previewW, previewH);
 }
 
 function constrainCrop() {
-    // Enforce aspect ratio
-    const currentAspect = (cropData.width * cropData.imageWidth) / (cropData.height * cropData.imageHeight);
-    if (Math.abs(currentAspect - ASPECT_RATIO) > 0.01) {
-        cropData.height = (cropData.width * cropData.imageWidth) / (ASPECT_RATIO * cropData.imageHeight);
+    const targetAspect = getCropAspectRatio();
+    
+    // Enforce aspect ratio (unless freeform)
+    if (targetAspect !== null) {
+        const currentAspect = (cropData.width * cropData.imageWidth) / (cropData.height * cropData.imageHeight);
+        if (Math.abs(currentAspect - targetAspect) > 0.01) {
+            cropData.height = (cropData.width * cropData.imageWidth) / (targetAspect * cropData.imageHeight);
+        }
     }
     
     // Constrain to image bounds
@@ -1658,6 +1800,7 @@ function handleCropMove(e) {
         constrainCrop();
     } else if (cropData.isResizing) {
         const handle = cropData.activeHandle;
+        const targetAspect = getCropAspectRatio();
         let newW = cropData.startCropW;
         let newH = cropData.startCropH;
         let newX = cropData.startCropX;
@@ -1666,24 +1809,41 @@ function handleCropMove(e) {
         // Handle resize based on which corner
         if (handle === 'se') {
             newW = Math.max(0.1, cropData.startCropW + dx);
+            if (targetAspect === null) {
+                // Freeform - adjust height independently
+                newH = Math.max(0.1, cropData.startCropH + dy);
+            }
         } else if (handle === 'sw') {
             newW = Math.max(0.1, cropData.startCropW - dx);
             newX = cropData.startCropX + (cropData.startCropW - newW);
+            if (targetAspect === null) {
+                newH = Math.max(0.1, cropData.startCropH + dy);
+            }
         } else if (handle === 'ne') {
             newW = Math.max(0.1, cropData.startCropW + dx);
-            const oldH = newH;
-            newH = (newW * cropData.imageWidth) / (ASPECT_RATIO * cropData.imageHeight);
-            newY = cropData.startCropY + (cropData.startCropH - newH);
+            if (targetAspect === null) {
+                newH = Math.max(0.1, cropData.startCropH - dy);
+                newY = cropData.startCropY + (cropData.startCropH - newH);
+            } else {
+                newH = (newW * cropData.imageWidth) / (targetAspect * cropData.imageHeight);
+                newY = cropData.startCropY + (cropData.startCropH - newH);
+            }
         } else if (handle === 'nw') {
             newW = Math.max(0.1, cropData.startCropW - dx);
             newX = cropData.startCropX + (cropData.startCropW - newW);
-            const oldH = newH;
-            newH = (newW * cropData.imageWidth) / (ASPECT_RATIO * cropData.imageHeight);
-            newY = cropData.startCropY + (cropData.startCropH - newH);
+            if (targetAspect === null) {
+                newH = Math.max(0.1, cropData.startCropH - dy);
+                newY = cropData.startCropY + (cropData.startCropH - newH);
+            } else {
+                newH = (newW * cropData.imageWidth) / (targetAspect * cropData.imageHeight);
+                newY = cropData.startCropY + (cropData.startCropH - newH);
+            }
         }
         
-        // Enforce aspect ratio
-        newH = (newW * cropData.imageWidth) / (ASPECT_RATIO * cropData.imageHeight);
+        // Enforce aspect ratio (unless freeform)
+        if (targetAspect !== null) {
+            newH = (newW * cropData.imageWidth) / (targetAspect * cropData.imageHeight);
+        }
         
         // Apply constraints
         if (newX >= 0 && newX + newW <= 1 && newY >= 0 && newY + newH <= 1) {
@@ -1727,6 +1887,36 @@ resetCropBtn.addEventListener('click', () => {
     updateCropPreview();
 });
 
+// Crop aspect ratio buttons
+cropAspectOptions.querySelectorAll('.crop-aspect-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Update active state
+        cropAspectOptions.querySelectorAll('.crop-aspect-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update aspect mode
+        cropAspectMode = btn.dataset.aspect;
+        
+        // Update hint text
+        updateCropHint();
+        
+        // Reset crop to fit new aspect ratio
+        resetCropToDefault();
+        updateCropBox();
+        updateCropPreview();
+    });
+});
+
+function updateCropHint() {
+    if (cropAspectMode === 'free') {
+        cropHint.textContent = 'Drag to position. Freeform crop.';
+    } else if (cropAspectMode === 'original') {
+        cropHint.textContent = 'Drag to position. Original aspect ratio.';
+    } else {
+        cropHint.textContent = `Drag to position. Maintains ${cropAspectMode} ratio.`;
+    }
+}
+
 // Update crop box on window resize
 window.addEventListener('resize', () => {
     if (cropSection.style.display !== 'none') {
@@ -1766,6 +1956,48 @@ removeDarkModeBtn.addEventListener('click', () => {
 
 // ========== Location Picker Functions ==========
 
+// Format location from Nominatim result with address details
+// Returns: { name: "formatted display", city, state, country, placeName, lat, lng }
+function formatLocationFromNominatim(result) {
+    const addr = result.address || {};
+    
+    // Get the place name (specific location like beach, park, etc.)
+    const placeName = addr.tourism || addr.amenity || addr.leisure || addr.natural || 
+                      addr.historic || addr.building || addr.shop || result.name || '';
+    
+    // Get city (Nominatim uses various fields for city-level)
+    const city = addr.city || addr.town || addr.village || addr.municipality || 
+                 addr.county || addr.district || '';
+    
+    // Get state/region
+    const state = addr.state || addr.region || addr.province || '';
+    
+    // Get country
+    const country = addr.country || '';
+    
+    // Build formatted name: "Place Name, City, State, Country"
+    const parts = [];
+    if (placeName && placeName !== city && placeName !== state && placeName !== country) {
+        parts.push(placeName);
+    }
+    if (city) parts.push(city);
+    if (state && state !== city) parts.push(state);
+    if (country) parts.push(country);
+    
+    const formattedName = parts.join(', ') || result.display_name;
+    
+    return {
+        name: formattedName,
+        placeName: placeName || null,
+        city: city || null,
+        state: state || null,
+        country: country || null,
+        lat: parseFloat(result.lat),
+        lng: parseFloat(result.lon),
+        fullName: result.display_name // Keep original for reference
+    };
+}
+
 // Search for locations using OpenStreetMap Nominatim API
 async function searchLocations(query) {
     if (!query || query.length < 2) {
@@ -1775,7 +2007,7 @@ async function searchLocations(query) {
     
     try {
         const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
             {
                 headers: {
                     'Accept': 'application/json',
@@ -1794,13 +2026,16 @@ async function searchLocations(query) {
             return;
         }
         
-        locationResults.innerHTML = results.map(result => `
-            <div class="location-result-item" data-name="${result.display_name.replace(/"/g, '&quot;')}" data-lat="${result.lat}" data-lng="${result.lon}">
+        // Format each result with structured address data
+        const formattedResults = results.map(result => formatLocationFromNominatim(result));
+        
+        locationResults.innerHTML = formattedResults.map((loc, index) => `
+            <div class="location-result-item" data-index="${index}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                 </svg>
-                <span>${result.display_name}</span>
+                <span>${loc.name}</span>
             </div>
         `).join('');
         locationResults.style.display = 'block';
@@ -1808,11 +2043,8 @@ async function searchLocations(query) {
         // Add click handlers to results
         locationResults.querySelectorAll('.location-result-item:not(.no-results)').forEach(item => {
             item.addEventListener('click', () => {
-                selectLocation({
-                    name: item.dataset.name,
-                    lat: parseFloat(item.dataset.lat),
-                    lng: parseFloat(item.dataset.lng)
-                });
+                const index = parseInt(item.dataset.index);
+                selectLocation(formattedResults[index]);
             });
         });
     } catch (error) {
@@ -1913,38 +2145,41 @@ function updateFramePreview() {
     
     if (!img.naturalWidth || !img.naturalHeight) return;
     
+    // Reset styles
+    img.style.maxWidth = '';
+    img.style.maxHeight = '';
+    
     if (frameData.type === 'none') {
         // No frame - show image normally
         container.style.padding = '0';
         container.style.backgroundColor = 'transparent';
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '300px';
     } else {
-        // Calculate frame padding based on inset width
-        const maxDimension = 300;
+        // Calculate frame padding based on inset width (scaled for preview)
         const paddingPercent = frameData.insetWidth / 100;
-        const padding = Math.round(maxDimension * paddingPercent * 0.15); // Scale down for preview
+        const basePadding = 20; // Base padding in pixels for preview
+        const padding = Math.round(basePadding * paddingPercent * 2) + 4; // Minimum 4px padding
         
-        // Apply frame styling
-        container.style.padding = `${Math.max(padding, 4)}px`;
+        // Apply frame styling - padding creates the visible frame border
+        container.style.padding = `${padding}px`;
         container.style.backgroundColor = frameData.color;
         
-        // If aspect ratio frame, adjust the image container
+        // For aspect ratio frames, we may need asymmetric padding
         if (frameData.type !== 'even') {
-            // Parse aspect ratio
             const [w, h] = frameData.type.split(':').map(Number);
             const targetRatio = w / h;
             const imgRatio = img.naturalWidth / img.naturalHeight;
             
-            // The frame creates space around the image to achieve target ratio
-            // For preview, we just show the frame color around the image
-            container.style.backgroundColor = frameData.color;
+            // Calculate how much extra padding is needed on which axis
+            if (imgRatio > targetRatio) {
+                // Image is wider than target - add vertical padding
+                const extraVertical = Math.round(padding * (imgRatio / targetRatio - 1) * 0.5);
+                container.style.padding = `${padding + extraVertical}px ${padding}px`;
+            } else if (imgRatio < targetRatio) {
+                // Image is taller than target - add horizontal padding
+                const extraHorizontal = Math.round(padding * (targetRatio / imgRatio - 1) * 0.5);
+                container.style.padding = `${padding}px ${padding + extraHorizontal}px`;
+            }
         }
-        
-        // Adjust image size within frame
-        const availableSize = maxDimension - (padding * 2);
-        img.style.maxWidth = `${availableSize}px`;
-        img.style.maxHeight = `${availableSize}px`;
     }
 }
 
@@ -2906,6 +3141,8 @@ const bulkInsetWidthSlider = document.getElementById('bulkInsetWidthSlider');
 const bulkInsetWidthValue = document.getElementById('bulkInsetWidthValue');
 const bulkFrameColorGroup = document.getElementById('bulkFrameColorGroup');
 const bulkFrameColorOptions = document.getElementById('bulkFrameColorOptions');
+const bulkFramePreview = document.getElementById('bulkFramePreview');
+const bulkFramePreviewImage = document.getElementById('bulkFramePreviewImage');
 
 // Bulk frame state
 let bulkFrameData = {
@@ -2950,6 +3187,12 @@ function resetBulkFrameData() {
     }
     if (bulkInsetWidthGroup) bulkInsetWidthGroup.style.display = 'none';
     if (bulkFrameColorGroup) bulkFrameColorGroup.style.display = 'none';
+    
+    // Reset preview styling (no frame for "No Change" state)
+    if (bulkFramePreview) {
+        bulkFramePreview.style.padding = '0';
+        bulkFramePreview.style.backgroundColor = 'transparent';
+    }
 }
 
 // Reset bulk location state
@@ -2959,6 +3202,51 @@ function resetBulkLocation() {
     if (bulkLocationResults) bulkLocationResults.style.display = 'none';
     if (bulkSelectedLocation) bulkSelectedLocation.style.display = 'none';
     if (bulkSelectedLocationName) bulkSelectedLocationName.textContent = '';
+}
+
+// Update bulk frame preview
+function updateBulkFramePreview() {
+    const img = bulkFramePreviewImage;
+    const container = bulkFramePreview;
+    
+    if (!img || !container || !img.naturalWidth || !img.naturalHeight) return;
+    
+    // Reset styles
+    img.style.maxWidth = '';
+    img.style.maxHeight = '';
+    
+    // If no change selected or no frame, show image normally
+    if (bulkFrameData.type === '' || bulkFrameData.type === 'none') {
+        container.style.padding = '0';
+        container.style.backgroundColor = 'transparent';
+    } else {
+        // Calculate frame padding based on inset width (scaled for preview)
+        const paddingPercent = bulkFrameData.insetWidth / 100;
+        const basePadding = 20; // Base padding in pixels for preview
+        const padding = Math.round(basePadding * paddingPercent * 2) + 4; // Minimum 4px padding
+        
+        // Apply frame styling - padding creates the visible frame border
+        container.style.padding = `${padding}px`;
+        container.style.backgroundColor = bulkFrameData.color;
+        
+        // For aspect ratio frames, we may need asymmetric padding
+        if (bulkFrameData.type !== 'even') {
+            const [w, h] = bulkFrameData.type.split(':').map(Number);
+            const targetRatio = w / h;
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            
+            // Calculate how much extra padding is needed on which axis
+            if (imgRatio > targetRatio) {
+                // Image is wider than target - add vertical padding
+                const extraVertical = Math.round(padding * (imgRatio / targetRatio - 1) * 0.5);
+                container.style.padding = `${padding + extraVertical}px ${padding}px`;
+            } else if (imgRatio < targetRatio) {
+                // Image is taller than target - add horizontal padding
+                const extraHorizontal = Math.round(padding * (targetRatio / imgRatio - 1) * 0.5);
+                container.style.padding = `${padding}px ${padding + extraHorizontal}px`;
+            }
+        }
+    }
 }
 
 // Open bulk edit modal
@@ -2975,6 +3263,17 @@ function openBulkEditModal() {
     
     // Update count
     bulkEditCount.textContent = selectedPosts.size;
+    
+    // Initialize frame preview with first selected photo
+    if (bulkFramePreviewImage) {
+        const firstSlug = Array.from(selectedPosts)[0];
+        const posts = filteredPosts.length > 0 ? filteredPosts : currentPosts;
+        const firstPost = posts.find(p => p.slug === firstSlug);
+        if (firstPost && firstPost.image) {
+            bulkFramePreviewImage.src = firstPost.image;
+            bulkFramePreviewImage.onload = () => updateBulkFramePreview();
+        }
+    }
     
     // Show modal
     bulkEditModal.style.display = 'flex';
@@ -3022,6 +3321,11 @@ async function applyBulkEdit() {
             lat: bulkLocation.lat,
             lng: bulkLocation.lng
         };
+        // Include structured address fields if present
+        if (bulkLocation.placeName) updates.location.placeName = bulkLocation.placeName;
+        if (bulkLocation.city) updates.location.city = bulkLocation.city;
+        if (bulkLocation.state) updates.location.state = bulkLocation.state;
+        if (bulkLocation.country) updates.location.country = bulkLocation.country;
     }
     
     // Check if there's anything to update
@@ -3093,6 +3397,9 @@ if (bulkFrameTypeOptions) {
             const showOptions = bulkFrameData.type !== '' && bulkFrameData.type !== 'none';
             if (bulkInsetWidthGroup) bulkInsetWidthGroup.style.display = showOptions ? 'block' : 'none';
             if (bulkFrameColorGroup) bulkFrameColorGroup.style.display = showOptions ? 'block' : 'none';
+            
+            // Update preview
+            updateBulkFramePreview();
         });
     });
 }
@@ -3102,6 +3409,7 @@ if (bulkInsetWidthSlider) {
     bulkInsetWidthSlider.addEventListener('input', () => {
         bulkFrameData.insetWidth = parseInt(bulkInsetWidthSlider.value);
         bulkInsetWidthValue.textContent = bulkFrameData.insetWidth + '%';
+        updateBulkFramePreview();
     });
 }
 
@@ -3112,6 +3420,7 @@ if (bulkFrameColorOptions) {
             bulkFrameColorOptions.querySelectorAll('.frame-color-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             bulkFrameData.color = btn.dataset.color;
+            updateBulkFramePreview();
         });
     });
 }
@@ -3136,7 +3445,7 @@ async function searchBulkLocations(query) {
     
     try {
         const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
             {
                 headers: {
                     'Accept': 'application/json',
@@ -3155,13 +3464,16 @@ async function searchBulkLocations(query) {
             return;
         }
         
-        bulkLocationResults.innerHTML = results.map(result => `
-            <div class="location-result-item" data-name="${result.display_name.replace(/"/g, '&quot;')}" data-lat="${result.lat}" data-lng="${result.lon}">
+        // Format each result with structured address data
+        const formattedResults = results.map(result => formatLocationFromNominatim(result));
+        
+        bulkLocationResults.innerHTML = formattedResults.map((loc, index) => `
+            <div class="location-result-item" data-index="${index}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                     <circle cx="12" cy="10" r="3"></circle>
                 </svg>
-                <span>${result.display_name}</span>
+                <span>${loc.name}</span>
             </div>
         `).join('');
         bulkLocationResults.style.display = 'block';
@@ -3169,11 +3481,8 @@ async function searchBulkLocations(query) {
         // Add click handlers to results
         bulkLocationResults.querySelectorAll('.location-result-item:not(.no-results)').forEach(item => {
             item.addEventListener('click', () => {
-                selectBulkLocation({
-                    name: item.dataset.name,
-                    lat: parseFloat(item.dataset.lat),
-                    lng: parseFloat(item.dataset.lng)
-                });
+                const index = parseInt(item.dataset.index);
+                selectBulkLocation(formattedResults[index]);
             });
         });
     } catch (error) {

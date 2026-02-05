@@ -30,7 +30,10 @@
                     {{/* Find dark mode image */}}
                     {{ $darkImage := $photo.Resources.GetMatch "image-dark.*" }}
                     
-                    {{/* Find main image */}}
+                    {{/* Find framed image (baked border) */}}
+                    {{ $framedImage := $photo.Resources.GetMatch "image-framed.*" }}
+                    
+                    {{/* Find main image - exclude dark mode, thumbnail, and framed */}}
                     {{ $image := "" }}
                     {{ range $photo.Resources.ByType "image" }}
                         {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) (not (hasPrefix .Name "image-framed")) }}
@@ -38,10 +41,18 @@
                         {{ end }}
                     {{ end }}
                     
-                    {{ if $image }}
+                    {{/* Use framed image if available, otherwise use original */}}
+                    {{ $imageSrc := "" }}
+                    {{ if $framedImage }}
+                        {{ $imageSrc = $framedImage.RelPermalink }}
+                    {{ else if $image }}
+                        {{ $imageSrc = $image.RelPermalink }}
+                    {{ end }}
+                    
+                    {{ if $imageSrc }}
                     <div class="album-photo-item"{{ if $darkImage }} data-dark-src="{{ $darkImage.RelPermalink }}"{{ end }}>
                         <a href="{{ $photo.RelPermalink }}">
-                            <img src="{{ $image.RelPermalink }}" 
+                            <img src="{{ $imageSrc }}" 
                                  alt="{{ $photo.Title }}" 
                                  class="album-photo-img"
                                  loading="lazy">

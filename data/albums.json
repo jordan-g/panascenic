@@ -31,10 +31,10 @@
       "layout": "horizontal",
       "thumbnailSlug": "2026-02-05T01-23-46-ml8rwbui7030",
       "stackedPreview": true,
-      "bgColor": null,
-      "bgColorDark": null,
+      "bgColor": "#000000",
+      "bgColorDark": "#000000",
       "createdAt": "2026-02-05T01:52:16.227Z",
-      "updatedAt": "2026-02-05T01:52:35.012Z"
+      "updatedAt": "2026-02-05T03:02:30.067Z"
     },
     {
       "id": "ml8t56ddbxisn",

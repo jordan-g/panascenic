@@ -13,9 +13,8 @@ const PORT = 3001;
 let hugoRestartTimer = null;
 const HUGO_RESTART_DEBOUNCE_MS = 2000; // Wait 2 seconds after last upload before restarting
 
-// Thumbnail dimensions (4:5 aspect ratio to match gallery)
-const THUMBNAIL_WIDTH = 600;
-const THUMBNAIL_HEIGHT = 750;
+// Thumbnail max dimension (will preserve crop aspect ratio)
+const THUMBNAIL_MAX_SIZE = 600;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -372,15 +371,18 @@ function generateFrontmatter(frontmatter, body) {
     if (Array.isArray(value)) {
       // Handle arrays (e.g., tags)
       if (value.length > 0) {
-        const items = value.map(item => `'${item.replace(/'/g, "''")}'`).join(', ');
+        const items = value.map(item => {
+          const escaped = item.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          return `"${escaped}"`;
+        }).join(', ');
         result += `${key} = [${items}]\n`;
       }
     } else if (typeof value === 'boolean') {
       result += `${key} = ${value}\n`;
     } else if (typeof value === 'string') {
-      // Escape single quotes
-      const escaped = value.replace(/'/g, "''");
-      result += `${key} = '${escaped}'\n`;
+      // Use double-quoted strings and escape backslashes and double quotes
+      const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      result += `${key} = "${escaped}"\n`;
     } else if (typeof value === 'object' && value !== null) {
       // Handle nested objects as TOML tables
       let tableStr = `\n[${key}]\n`;
@@ -390,7 +392,8 @@ function generateFrontmatter(frontmatter, body) {
         } else if (typeof subValue === 'boolean') {
           tableStr += `${subKey} = ${subValue}\n`;
         } else if (typeof subValue === 'string') {
-          tableStr += `${subKey} = '${subValue.replace(/'/g, "''")}'\n`;
+          const escaped = subValue.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          tableStr += `${subKey} = "${escaped}"\n`;
         }
       }
       tables.push(tableStr);
@@ -428,10 +431,11 @@ async function findImageFile(dir) {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
   for (const file of files) {
     const ext = path.extname(file).toLowerCase();
-    // Skip dark mode, thumbnail, and markdown files
+    // Skip dark mode, thumbnail, framed, and markdown files
     if (imageExtensions.includes(ext) && 
         !file.startsWith('image-dark') && 
         !file.startsWith('thumbnail') &&
+        !file.startsWith('image-framed') &&
         file !== 'index.md') {
       return file;
     }
@@ -575,13 +579,27 @@ async function generateThumbnail(imagePath, outputPath, cropData) {
     const safeW = Math.min(cropW, metadata.width - safeX);
     const safeH = Math.min(cropH, metadata.height - safeY);
     
+    // Calculate output dimensions preserving crop aspect ratio
+    const cropAspect = safeW / safeH;
+    let outputW, outputH;
+    
+    if (cropAspect > 1) {
+      // Wider than tall - constrain by width
+      outputW = THUMBNAIL_MAX_SIZE;
+      outputH = Math.round(THUMBNAIL_MAX_SIZE / cropAspect);
+    } else {
+      // Taller than wide - constrain by height
+      outputH = THUMBNAIL_MAX_SIZE;
+      outputW = Math.round(THUMBNAIL_MAX_SIZE * cropAspect);
+    }
+    
     await image
       .extract({ left: safeX, top: safeY, width: safeW, height: safeH })
-      .resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'cover' })
+      .resize(outputW, outputH, { fit: 'fill' })
       .jpeg({ quality: 85 })
       .toFile(outputPath);
     
-    console.log(`Generated thumbnail: ${outputPath}`);
+    console.log(`Generated thumbnail: ${outputPath} (${outputW}x${outputH})`);
     return true;
   } catch (error) {
     console.error('Error generating thumbnail:', error);
@@ -903,6 +921,11 @@ app.put('/api/posts/:slug', uploadFields, async (req, res) => {
             lat: locationParsed.lat,
             lng: locationParsed.lng
           };
+          // Save optional structured address fields if present
+          if (locationParsed.placeName) frontmatter.location.placeName = locationParsed.placeName;
+          if (locationParsed.city) frontmatter.location.city = locationParsed.city;
+          if (locationParsed.state) frontmatter.location.state = locationParsed.state;
+          if (locationParsed.country) frontmatter.location.country = locationParsed.country;
         } else {
           delete frontmatter.location;
         }
@@ -1159,6 +1182,11 @@ app.post('/api/posts/batch-update', express.json(), async (req, res) => {
                 lat: locationParsed.lat,
                 lng: locationParsed.lng
               };
+              // Save optional structured address fields if present
+              if (locationParsed.placeName) frontmatter.location.placeName = locationParsed.placeName;
+              if (locationParsed.city) frontmatter.location.city = locationParsed.city;
+              if (locationParsed.state) frontmatter.location.state = locationParsed.state;
+              if (locationParsed.country) frontmatter.location.country = locationParsed.country;
             }
           } catch (parseError) {
             console.error(`Error parsing location data for ${slug}:`, parseError);

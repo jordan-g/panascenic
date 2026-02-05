@@ -1,17 +1,18 @@
 +++
-title = ''
-date = '2026-02-05T01:24:04.670Z'
+title = "Roshko 2"
+date = "2026-02-05T01:24:04.670Z"
 draft = false
 
 [location]
-name = 'Bulgaria'
+name = "Bulgaria"
 lat = 42.6073975
 lng = 25.4856617
 
 [thumbnailCrop]
 x = 0
-y = 0.03125
+y = 0
 width = 1
-height = 0.9375
+height = 1
+aspect = "original"
 +++
 

@@ -92,7 +92,7 @@
                                 Sort
                             </button>
                             <div class="sort-menu" id="sortMenu">
-                                <button class="sort-menu-item active" data-sort="date" data-order="desc" onclick="setSort('date', 'desc')">
+                                <button class="sort-menu-item" data-sort="date" data-order="desc" onclick="setSort('date', 'desc')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                         <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -128,7 +128,7 @@
                                     Title (Z–A)
                                 </button>
                                 <div class="sort-menu-divider"></div>
-                                <button class="sort-menu-item" data-sort="gallery" data-order="asc" onclick="setSort('gallery', 'asc')">
+                                <button class="sort-menu-item active" data-sort="gallery" data-order="asc" onclick="setSort('gallery', 'asc')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="3" y="3" width="7" height="7"></rect>
                                         <rect x="14" y="3" width="7" height="7"></rect>
@@ -269,7 +269,25 @@
                                     </svg>
                                 </div>
                                 <div class="collapsible-body">
-                                    <p class="crop-section-hint">Drag to position. Maintains 4:5 ratio.</p>
+                                    <div class="crop-control-group">
+                                        <label class="crop-control-label">Aspect Ratio</label>
+                                        <div class="crop-aspect-options" id="cropAspectOptions">
+                                            <button type="button" class="crop-aspect-btn" data-aspect="original" title="Original">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                                </svg>
+                                            </button>
+                                            <button type="button" class="crop-aspect-btn" data-aspect="1:1">1:1</button>
+                                            <button type="button" class="crop-aspect-btn active" data-aspect="4:5">4:5</button>
+                                            <button type="button" class="crop-aspect-btn" data-aspect="3:4">3:4</button>
+                                            <button type="button" class="crop-aspect-btn" data-aspect="9:16">9:16</button>
+                                            <button type="button" class="crop-aspect-btn" data-aspect="16:9">16:9</button>
+                                            <button type="button" class="crop-aspect-btn" data-aspect="free" title="Freeform">Free</button>
+                                        </div>
+                                    </div>
+                                    <p class="crop-section-hint" id="cropHint">Drag to position. Maintains 4:5 ratio.</p>
                                     <div class="crop-container">
                                         <div id="cropWrapper" class="crop-wrapper">
                                             <img id="cropImage" src="" alt="Crop source">
@@ -754,6 +772,11 @@
                 <!-- Frame Options -->
                 <div class="form-group bulk-frame-section">
                     <label>Frame Options</label>
+                    <div class="frame-preview-container">
+                        <div id="bulkFramePreview" class="frame-preview">
+                            <img id="bulkFramePreviewImage" src="" alt="Frame preview">
+                        </div>
+                    </div>
                     <div class="frame-control-group">
                         <label class="frame-control-label">Type</label>
                         <div class="frame-type-options" id="bulkFrameTypeOptions">
