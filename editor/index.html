@@ -33,6 +33,14 @@
                     </svg>
                     Albums
                 </button>
+                <button class="tab-btn" data-tab="site">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    Site
+                </button>
             </div>
 
             <!-- Photos Tab Content -->
@@ -689,7 +697,67 @@
                     </div>
                 </form>
             </div>
+
+            <!-- Site Tab Content -->
+            <div id="siteTab" class="tab-content">
+                <div class="site-settings">
+                    <section class="site-setting-section">
+                        <h3 class="site-setting-title">Favicon</h3>
+                        <p class="site-setting-desc">Site icon (browser tab). Pick a photo and crop it to a circle.</p>
+                        <div class="favicon-current-row">
+                            <div id="faviconPreview" class="favicon-preview" style="display: none;">
+                                <img id="faviconPreviewImg" src="" alt="Current favicon">
+                            </div>
+                            <button type="button" id="changeFaviconBtn" class="btn btn-primary">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                                </svg>
+                                <span id="changeFaviconBtnText">Set Favicon</span>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </main>
+    </div>
+
+    <!-- Favicon Modal: pick photo then circular crop -->
+    <div id="faviconModal" class="modal" style="display: none;">
+        <div class="modal-content modal-content-md">
+            <div class="modal-header">
+                <h3 id="faviconModalTitle">Choose Photo</h3>
+                <button type="button" id="closeFaviconModalBtn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="faviconStepPick" class="favicon-step">
+                    <p class="favicon-step-hint">Select a photo from your gallery to use as the favicon.</p>
+                    <div id="faviconPickGrid" class="modal-photos-grid"></div>
+                </div>
+                <div id="faviconStepCrop" class="favicon-step" style="display: none;">
+                    <p class="favicon-step-hint">Position the square crop. The favicon will be a circle from this area.</p>
+                    <div class="favicon-crop-container">
+                        <div id="faviconCropWrapper" class="favicon-crop-wrapper">
+                            <img id="faviconCropImage" src="" alt="Crop">
+                            <div id="faviconCropOverlay" class="favicon-crop-overlay">
+                                <div id="faviconCropBox" class="favicon-crop-box"></div>
+                            </div>
+                        </div>
+                        <div class="favicon-preview-row">
+                            <span class="favicon-preview-label">Preview:</span>
+                            <canvas id="faviconCirclePreview" class="favicon-circle-preview" width="64" height="64"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="faviconBackBtn" class="btn btn-secondary" style="display: none;">Back</button>
+                <button type="button" id="faviconNextBtn" class="btn btn-primary" style="display: none;">Next</button>
+                <button type="button" id="faviconSaveBtn" class="btn btn-primary" style="display: none;">Save as Favicon</button>
+                <button type="button" id="faviconCancelBtn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <!-- Highlighted Photos Modal (admin only) -->

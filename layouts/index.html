@@ -210,7 +210,8 @@
             {{ $darkThumb := $darkImage.Fit "2000x2000" }}
             {{ $thumbnailSrcDark = $darkThumb.RelPermalink }}
         {{ end }}
-        {{ $scale := div $sizePercent 100 }}
+        {{ $scaleRaw := div ($sizePercent | default 200) 100 }}
+        {{ $scale := cond (lt $scaleRaw 1) 1 $scaleRaw }}
         <article class="photo-item photo-item-highlighted" style="--highlight-scale: {{ $scale }};" data-slug="{{ path.Base $page.File.Dir }}" data-tags="{{ delimit $tagsLower "," }}"{{ if $thumbnailSrcDark }} data-dark-src="{{ $thumbnailSrcDark }}"{{ end }}>
             <a href="{{ $page.RelPermalink }}" class="photo-link">
                 {{ if $thumbnailSrc }}

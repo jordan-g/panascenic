@@ -2484,6 +2484,7 @@ fetch('/api/health')
 const mainTabs = document.getElementById('mainTabs');
 const photosTab = document.getElementById('photosTab');
 const albumsTab = document.getElementById('albumsTab');
+const siteTab = document.getElementById('siteTab');
 const albumEditView = document.getElementById('albumEditView');
 const albumsList = document.getElementById('albumsList');
 const createAlbumBtn = document.getElementById('createAlbumBtn');
@@ -2517,6 +2518,27 @@ const albumSelectModal = document.getElementById('albumSelectModal');
 const albumSelectList = document.getElementById('albumSelectList');
 const closeAlbumSelectBtn = document.getElementById('closeAlbumSelectBtn');
 const cancelAlbumSelectBtn = document.getElementById('cancelAlbumSelectBtn');
+
+// Site tab & Favicon modal elements
+const faviconPreview = document.getElementById('faviconPreview');
+const faviconPreviewImg = document.getElementById('faviconPreviewImg');
+const changeFaviconBtn = document.getElementById('changeFaviconBtn');
+const changeFaviconBtnText = document.getElementById('changeFaviconBtnText');
+const faviconModal = document.getElementById('faviconModal');
+const faviconModalTitle = document.getElementById('faviconModalTitle');
+const closeFaviconModalBtn = document.getElementById('closeFaviconModalBtn');
+const faviconStepPick = document.getElementById('faviconStepPick');
+const faviconStepCrop = document.getElementById('faviconStepCrop');
+const faviconPickGrid = document.getElementById('faviconPickGrid');
+const faviconCropWrapper = document.getElementById('faviconCropWrapper');
+const faviconCropImage = document.getElementById('faviconCropImage');
+const faviconCropOverlay = document.getElementById('faviconCropOverlay');
+const faviconCropBox = document.getElementById('faviconCropBox');
+const faviconCirclePreview = document.getElementById('faviconCirclePreview');
+const faviconBackBtn = document.getElementById('faviconBackBtn');
+const faviconNextBtn = document.getElementById('faviconNextBtn');
+const faviconSaveBtn = document.getElementById('faviconSaveBtn');
+const faviconCancelBtn = document.getElementById('faviconCancelBtn');
 
 // Thumbnail settings elements
 const thumbnailSection = document.getElementById('thumbnailSection');
@@ -2606,16 +2628,241 @@ mainTabs.addEventListener('click', (e) => {
     if (tabName === 'photos') {
         photosTab.classList.add('active');
         albumsTab.classList.remove('active');
+        if (siteTab) siteTab.classList.remove('active');
         albumEditView.style.display = 'none';
-        // Switch to management view (list) if in form view
         showManagementView();
     } else if (tabName === 'albums') {
         photosTab.classList.remove('active');
         albumsTab.classList.add('active');
+        if (siteTab) siteTab.classList.remove('active');
         albumEditView.style.display = 'none';
         loadAlbums();
+    } else if (tabName === 'site' && siteTab) {
+        photosTab.classList.remove('active');
+        albumsTab.classList.remove('active');
+        siteTab.classList.add('active');
+        albumEditView.style.display = 'none';
+        loadSiteTab();
     }
 });
+
+// ========== Site Tab & Favicon ==========
+
+async function loadSiteTab() {
+    if (!faviconPreview || !faviconPreviewImg || !changeFaviconBtn || !changeFaviconBtnText) return;
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        const faviconPath = data.favicon ? `/${data.favicon}` : null;
+        if (faviconPath) {
+            faviconPreviewImg.src = faviconPath + '?t=' + Date.now();
+            faviconPreview.style.display = 'block';
+            changeFaviconBtnText.textContent = 'Change Favicon';
+        } else {
+            faviconPreview.style.display = 'none';
+            changeFaviconBtnText.textContent = 'Set Favicon';
+        }
+    } catch (e) {
+        faviconPreview.style.display = 'none';
+        changeFaviconBtnText.textContent = 'Set Favicon';
+    }
+}
+
+let faviconSelectedSlug = null;
+let faviconSelectedImage = null;
+let faviconCropData = { x: 0.25, y: 0.25, size: 0.5 };
+let faviconCropImageWidth = 1;
+let faviconCropImageHeight = 1;
+let faviconCropDragging = false;
+let faviconCropStartX = 0;
+let faviconCropStartY = 0;
+
+function openFaviconModal() {
+    faviconSelectedSlug = null;
+    faviconSelectedImage = null;
+    faviconStepPick.style.display = 'block';
+    faviconStepCrop.style.display = 'none';
+    faviconModalTitle.textContent = 'Choose Photo';
+    faviconBackBtn.style.display = 'none';
+    faviconNextBtn.style.display = 'none';
+    faviconSaveBtn.style.display = 'none';
+    faviconCancelBtn.style.display = 'inline-flex';
+    if (allPosts.length === 0) {
+        fetch('/api/posts').then(r => r.json()).then(data => {
+            allPosts = data.posts || [];
+            renderFaviconPickGrid();
+        });
+    } else {
+        renderFaviconPickGrid();
+    }
+    faviconModal.style.display = 'flex';
+}
+
+function renderFaviconPickGrid() {
+    if (!faviconPickGrid) return;
+    faviconPickGrid.innerHTML = (allPosts || [])
+        .filter(p => p.image)
+        .map(post => `
+            <div class="modal-photo-item ${faviconSelectedSlug === post.slug ? 'selected' : ''}" data-slug="${post.slug}" data-image="${escapeHtml(post.image)}">
+                <img src="${post.image}" alt="">
+            </div>
+        `).join('');
+    faviconPickGrid.querySelectorAll('.modal-photo-item').forEach(el => {
+        el.addEventListener('click', () => {
+            faviconSelectedSlug = el.dataset.slug;
+            faviconSelectedImage = el.dataset.image;
+            faviconPickGrid.querySelectorAll('.modal-photo-item').forEach(i => i.classList.remove('selected'));
+            el.classList.add('selected');
+            faviconNextBtn.style.display = 'inline-flex';
+        });
+    });
+}
+
+function showFaviconCropStep() {
+    if (!faviconSelectedSlug || !faviconSelectedImage) return;
+    faviconStepPick.style.display = 'none';
+    faviconStepCrop.style.display = 'block';
+    faviconModalTitle.textContent = 'Crop to Circle';
+    faviconBackBtn.style.display = 'inline-flex';
+    faviconNextBtn.style.display = 'none';
+    faviconSaveBtn.style.display = 'inline-flex';
+    faviconCropImage.onload = () => {
+        faviconCropImageWidth = faviconCropImage.naturalWidth;
+        faviconCropImageHeight = faviconCropImage.naturalHeight;
+        const imgAspect = faviconCropImageWidth / faviconCropImageHeight;
+        const size = Math.min(1, 1 / imgAspect, imgAspect);
+        faviconCropData.size = size;
+        faviconCropData.x = (1 - size) / 2;
+        faviconCropData.y = (1 - size) / 2;
+        updateFaviconCropBox();
+        updateFaviconCirclePreview();
+    };
+    faviconCropImage.src = faviconSelectedImage;
+}
+
+function updateFaviconCropBox() {
+    if (!faviconCropWrapper || !faviconCropBox) return;
+    const imgRect = faviconCropImage.getBoundingClientRect();
+    const wrapperRect = faviconCropWrapper.getBoundingClientRect();
+    const x = faviconCropData.x * imgRect.width;
+    const y = faviconCropData.y * imgRect.height;
+    const s = Math.min(faviconCropData.size * imgRect.width, faviconCropData.size * imgRect.height);
+    faviconCropBox.style.left = (imgRect.left - wrapperRect.left + x) + 'px';
+    faviconCropBox.style.top = (imgRect.top - wrapperRect.top + y) + 'px';
+    faviconCropBox.style.width = s + 'px';
+    faviconCropBox.style.height = s + 'px';
+}
+
+function updateFaviconCirclePreview() {
+    const ctx = faviconCirclePreview.getContext('2d');
+    const d = 64;
+    const sx = faviconCropData.x * faviconCropImageWidth;
+    const sy = faviconCropData.y * faviconCropImageHeight;
+    const sw = faviconCropData.size * faviconCropImageWidth;
+    const sh = faviconCropData.size * faviconCropImageHeight;
+    ctx.clearRect(0, 0, d, d);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(d / 2, d / 2, d / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(faviconCropImage, sx, sy, sw, sh, 0, 0, d, d);
+    ctx.restore();
+}
+
+function constrainFaviconCrop() {
+    const s = faviconCropData.size;
+    faviconCropData.x = Math.max(0, Math.min(faviconCropData.x, 1 - s));
+    faviconCropData.y = Math.max(0, Math.min(faviconCropData.y, 1 - s));
+}
+
+function faviconCropPointerDown(e) {
+    e.preventDefault();
+    faviconCropDragging = true;
+    faviconCropStartX = (e.touches ? e.touches[0].clientX : e.clientX);
+    faviconCropStartY = (e.touches ? e.touches[0].clientY : e.clientY);
+}
+
+function faviconCropPointerMove(e) {
+    if (!faviconCropDragging) return;
+    e.preventDefault();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX);
+    const y = (e.touches ? e.touches[0].clientY : e.clientY);
+    const imgRect = faviconCropImage.getBoundingClientRect();
+    const dx = (x - faviconCropStartX) / imgRect.width;
+    const dy = (y - faviconCropStartY) / imgRect.height;
+    faviconCropStartX = x;
+    faviconCropStartY = y;
+    faviconCropData.x += dx;
+    faviconCropData.y += dy;
+    constrainFaviconCrop();
+    updateFaviconCropBox();
+    updateFaviconCirclePreview();
+}
+
+function faviconCropPointerUp() {
+    faviconCropDragging = false;
+}
+
+async function saveFavicon() {
+    if (!faviconSelectedSlug) return;
+    faviconSaveBtn.disabled = true;
+    try {
+        const crop = {
+            x: faviconCropData.x,
+            y: faviconCropData.y,
+            width: faviconCropData.size,
+            height: faviconCropData.size
+        };
+        const response = await fetch('/api/favicon', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug: faviconSelectedSlug, crop })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to save favicon');
+        showMessage('Favicon updated.', 'success');
+        closeFaviconModal();
+        loadSiteTab();
+    } catch (err) {
+        showMessage(err.message || 'Failed to save favicon', 'error');
+    } finally {
+        faviconSaveBtn.disabled = false;
+    }
+}
+
+function closeFaviconModal() {
+    faviconModal.style.display = 'none';
+    faviconSelectedSlug = null;
+    faviconSelectedImage = null;
+}
+
+if (changeFaviconBtn) {
+    changeFaviconBtn.addEventListener('click', openFaviconModal);
+}
+if (closeFaviconModalBtn) closeFaviconModalBtn.addEventListener('click', closeFaviconModal);
+if (faviconCancelBtn) faviconCancelBtn.addEventListener('click', closeFaviconModal);
+if (faviconBackBtn) {
+    faviconBackBtn.addEventListener('click', () => {
+        faviconStepPick.style.display = 'block';
+        faviconStepCrop.style.display = 'none';
+        faviconModalTitle.textContent = 'Choose Photo';
+        faviconBackBtn.style.display = 'none';
+        faviconNextBtn.style.display = 'inline-flex';
+        faviconSaveBtn.style.display = 'none';
+    });
+}
+if (faviconNextBtn) faviconNextBtn.addEventListener('click', showFaviconCropStep);
+if (faviconSaveBtn) faviconSaveBtn.addEventListener('click', saveFavicon);
+
+if (faviconCropBox) {
+    faviconCropBox.addEventListener('mousedown', faviconCropPointerDown);
+    faviconCropBox.addEventListener('touchstart', faviconCropPointerDown, { passive: false });
+}
+document.addEventListener('mousemove', faviconCropPointerMove);
+document.addEventListener('touchmove', faviconCropPointerMove, { passive: false });
+document.addEventListener('mouseup', faviconCropPointerUp);
+document.addEventListener('touchend', faviconCropPointerUp);
 
 // Load albums
 async function loadAlbums() {

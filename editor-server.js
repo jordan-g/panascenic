@@ -90,6 +90,8 @@ app.use(express.json());
 app.use(express.static('editor'));
 // Serve photos from content/photos directory
 app.use('/photos', express.static(path.join(__dirname, 'content', 'photos')));
+// Serve static assets (e.g. favicon) for editor preview
+app.use(express.static(path.join(__dirname, 'static')));
 
 // CORS headers
 app.use((req, res, next) => {
@@ -1710,6 +1712,72 @@ app.put('/api/highlighted-photos', async (req, res) => {
   } catch (error) {
     console.error('Error saving highlighted photos:', error);
     res.status(500).json({ error: 'Failed to save highlighted photos' });
+  }
+});
+
+// Get site config (e.g. current favicon)
+app.get('/api/config', async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, 'hugo.toml');
+    const content = await fs.readFile(configPath, 'utf-8');
+    const faviconMatch = content.match(/favicon\s*=\s*["']([^"']+)["']/);
+    res.json({ favicon: faviconMatch ? faviconMatch[1] : null });
+  } catch (error) {
+    console.error('Error reading config:', error);
+    res.status(500).json({ error: error.message || 'Failed to read config' });
+  }
+});
+
+// Create favicon from gallery photo with circular crop
+app.post('/api/favicon', express.json(), async (req, res) => {
+  try {
+    const { slug, crop } = req.body;
+    if (!slug || !crop || typeof crop.x !== 'number' || typeof crop.y !== 'number' || typeof crop.width !== 'number' || typeof crop.height !== 'number') {
+      return res.status(400).json({ error: 'Missing slug or crop (x, y, width, height as 0–1)' });
+    }
+    const postDir = path.join(__dirname, 'content', 'photos', slug);
+    if (!(await fs.pathExists(postDir))) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+    const imageFile = await findImageFile(postDir);
+    if (!imageFile) {
+      return res.status(400).json({ error: 'No image found for this photo' });
+    }
+    const imagePath = path.join(postDir, imageFile);
+    const metadata = await sharp(imagePath).metadata();
+    const w = metadata.width;
+    const h = metadata.height;
+    const x = Math.round(crop.x * w);
+    const y = Math.round(crop.y * h);
+    const size = Math.min(Math.round(crop.width * w), Math.round(crop.height * h), w - x, h - y);
+    const faviconSize = 64;
+    const circleSvg = `<svg width="${faviconSize}" height="${faviconSize}"><circle cx="${faviconSize / 2}" cy="${faviconSize / 2}" r="${faviconSize / 2}" fill="white"/></svg>`;
+    const cropped = await sharp(imagePath)
+      .extract({ left: x, top: y, width: size, height: size })
+      .resize(faviconSize, faviconSize)
+      .toBuffer();
+    const circleMask = Buffer.from(circleSvg);
+    const faviconBuffer = await sharp(cropped)
+      .composite([{ input: circleMask, blend: 'dest-in' }])
+      .png()
+      .toBuffer();
+    const staticDir = path.join(__dirname, 'static');
+    await fs.ensureDir(staticDir);
+    const faviconPath = path.join(staticDir, 'favicon.png');
+    await fs.writeFile(faviconPath, faviconBuffer);
+    const configPath = path.join(__dirname, 'hugo.toml');
+    let configContent = await fs.readFile(configPath, 'utf-8');
+    if (configContent.match(/favicon\s*=/)) {
+      configContent = configContent.replace(/favicon\s*=\s*["'][^"']*["']/, 'favicon = "favicon.png"');
+    } else {
+      configContent = configContent.replace(/(\[params\]\s*\n)/, '$1favicon = "favicon.png"\n');
+    }
+    await fs.writeFile(configPath, configContent);
+    debouncedHugoRestart();
+    res.json({ success: true, favicon: 'favicon.png' });
+  } catch (error) {
+    console.error('Favicon error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create favicon' });
   }
 });
 

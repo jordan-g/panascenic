@@ -3,4 +3,5 @@ languageCode = 'en-us'
 title = 'panascenic'
 
 [params]
+favicon = "favicon.png"
 description = 'A simple, clean photography portfolio'
