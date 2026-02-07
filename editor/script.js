@@ -2913,7 +2913,7 @@ function renderAlbums(albums) {
         postsMap[post.slug] = post;
     });
     
-    albumsList.innerHTML = albums.map(album => {
+    albumsList.innerHTML = albums.map((album, index) => {
         const photoCount = album.photoSlugs ? album.photoSlugs.length : 0;
         
         // Get preview images (up to 4)
@@ -2943,18 +2943,33 @@ function renderAlbums(albums) {
         }
         
         return `
-            <div class="album-card-editor" data-album-id="${album.id}" onclick="editAlbum('${album.id}')">
-                <div class="album-card-preview">
-                    ${previewHtml}
+            <div class="album-card-editor" data-album-id="${album.id}" data-index="${index}" draggable="true">
+                <div class="album-drag-handle" title="Drag to reorder">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="9" cy="6" r="1.5"></circle>
+                        <circle cx="15" cy="6" r="1.5"></circle>
+                        <circle cx="9" cy="12" r="1.5"></circle>
+                        <circle cx="15" cy="12" r="1.5"></circle>
+                        <circle cx="9" cy="18" r="1.5"></circle>
+                        <circle cx="15" cy="18" r="1.5"></circle>
+                    </svg>
                 </div>
-                <div class="album-card-info">
-                    <h3 class="album-card-name">${escapeHtml(album.name)}</h3>
-                    ${album.description ? `<p class="album-card-desc">${escapeHtml(album.description)}</p>` : ''}
-                    <div class="album-card-meta">${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>
+                <div class="album-card-clickable" onclick="editAlbum('${album.id}')">
+                    <div class="album-card-preview">
+                        ${previewHtml}
+                    </div>
+                    <div class="album-card-info">
+                        <h3 class="album-card-name">${escapeHtml(album.name)}</h3>
+                        ${album.description ? `<p class="album-card-desc">${escapeHtml(album.description)}</p>` : ''}
+                        <div class="album-card-meta">${photoCount} photo${photoCount !== 1 ? 's' : ''}</div>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
+    
+    // Initialize album drag-and-drop
+    initAlbumCardDragDrop();
 }
 
 // Create album button
@@ -3350,6 +3365,123 @@ function showAlbumsView() {
     albumEditView.style.display = 'none';
     albumsTab.classList.add('active');
     loadAlbums();
+}
+
+// ========== Album Card Drag & Drop Reordering ==========
+let draggedAlbumCard = null;
+let draggedAlbumIndex = null;
+let albumDragStartedFromHandle = false;
+
+function initAlbumCardDragDrop() {
+    const cards = albumsList.querySelectorAll('.album-card-editor');
+    
+    cards.forEach(card => {
+        // Only allow drag to start from the handle
+        const handle = card.querySelector('.album-drag-handle');
+        if (handle) {
+            handle.addEventListener('mousedown', () => { albumDragStartedFromHandle = true; });
+            handle.addEventListener('touchstart', () => { albumDragStartedFromHandle = true; }, { passive: true });
+        }
+        
+        card.addEventListener('dragstart', handleAlbumCardDragStart);
+        card.addEventListener('dragend', handleAlbumCardDragEnd);
+        card.addEventListener('dragover', handleAlbumCardDragOver);
+        card.addEventListener('dragenter', handleAlbumCardDragEnter);
+        card.addEventListener('dragleave', handleAlbumCardDragLeave);
+        card.addEventListener('drop', handleAlbumCardDrop);
+    });
+}
+
+function handleAlbumCardDragStart(e) {
+    if (!albumDragStartedFromHandle) {
+        e.preventDefault();
+        return;
+    }
+    draggedAlbumCard = this;
+    draggedAlbumIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.albumId);
+    
+    // Reset handle flag after a short delay
+    setTimeout(() => { albumDragStartedFromHandle = false; }, 0);
+}
+
+function handleAlbumCardDragEnd(e) {
+    this.classList.remove('dragging');
+    draggedAlbumCard = null;
+    draggedAlbumIndex = null;
+    albumDragStartedFromHandle = false;
+    
+    // Remove all drag-over classes
+    albumsList.querySelectorAll('.album-card-editor').forEach(card => {
+        card.classList.remove('drag-over-above', 'drag-over-below');
+    });
+}
+
+function handleAlbumCardDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleAlbumCardDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedAlbumCard) {
+        const thisIndex = parseInt(this.dataset.index);
+        // Show indicator above or below depending on direction
+        this.classList.remove('drag-over-above', 'drag-over-below');
+        if (thisIndex < draggedAlbumIndex) {
+            this.classList.add('drag-over-above');
+        } else {
+            this.classList.add('drag-over-below');
+        }
+    }
+}
+
+function handleAlbumCardDragLeave(e) {
+    this.classList.remove('drag-over-above', 'drag-over-below');
+}
+
+function handleAlbumCardDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (this !== draggedAlbumCard && draggedAlbumIndex !== null) {
+        const fromIndex = draggedAlbumIndex;
+        const toIndex = parseInt(this.dataset.index);
+        
+        // Save the new order via API
+        saveAlbumOrder(fromIndex, toIndex);
+    }
+    
+    return false;
+}
+
+async function saveAlbumOrder(fromIndex, toIndex) {
+    try {
+        const response = await fetch('/api/albums/reorder', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fromIndex, toIndex })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to reorder albums');
+        }
+        
+        // Reload albums to reflect new order
+        loadAlbums();
+        
+        // Also refresh the album filter cache
+        allAlbums = data.albums || allAlbums;
+        
+    } catch (error) {
+        console.error('Error reordering albums:', error);
+        // Reload to reset state on failure
+        loadAlbums();
+    }
 }
 
 // Album form submission

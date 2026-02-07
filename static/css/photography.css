@@ -22,7 +22,7 @@ html.wf-inactive body {
     --text-color-muted: #999;
     --border-color: #e5e5e5;
     --photo-bg: #f0efed;
-    --overlay-gradient-start: rgba(0, 0, 0, 0.7);
+    --overlay-gradient-start: rgba(0, 0, 0, 0.1);
     --overlay-text: #fff;
     --shadow-color: rgba(0, 0, 0, 0.1);
 }
@@ -36,7 +36,7 @@ html.wf-inactive body {
         --text-color-muted: #808080;
         --border-color: #404040;
         --photo-bg: #2a2a2a;
-        --overlay-gradient-start: rgba(0, 0, 0, 0.8);
+        --overlay-gradient-start: rgba(0, 0, 0, 0.1);
         --overlay-text: #fff;
         --shadow-color: rgba(0, 0, 0, 0.5);
     }
@@ -50,7 +50,7 @@ html.wf-inactive body {
     --text-color-muted: #808080;
     --border-color: #404040;
     --photo-bg: #2a2a2a;
-    --overlay-gradient-start: rgba(0, 0, 0, 0.8);
+    --overlay-gradient-start: rgba(0, 0, 0, 0.45);
     --overlay-text: #fff;
     --shadow-color: rgba(0, 0, 0, 0.5);
 }
@@ -63,7 +63,7 @@ html.wf-inactive body {
     --text-color-muted: #999;
     --border-color: #e5e5e5;
     --photo-bg: #f0efed;
-    --overlay-gradient-start: rgba(0, 0, 0, 0.7);
+    --overlay-gradient-start: rgba(0, 0, 0, 0.4);
     --overlay-text: #fff;
     --shadow-color: rgba(0, 0, 0, 0.1);
 }

@@ -1,6 +1,23 @@
 {
   "albums": [
     {
+      "id": "mlccohgdzonv0",
+      "name": "frosted",
+      "description": "",
+      "photoSlugs": [
+        "frosted-3-mlccm4533wbm",
+        "frosted-1-mlccm2fem0in",
+        "2026-02-07T13-27-50-mlccn6rs0kdv"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "frosted-3-mlccm4533wbm",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": "#FFFFFF",
+      "createdAt": "2026-02-07T13:28:51.037Z",
+      "updatedAt": "2026-02-07T13:29:46.663Z"
+    },
+    {
       "id": "ml8rymcwotirh",
       "name": "by the sea",
       "description": "2024.09.30 - shot on iPhone",

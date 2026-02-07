@@ -1438,6 +1438,39 @@ app.get('/api/albums', async (req, res) => {
   }
 });
 
+// Reorder albums
+app.put('/api/albums/reorder', async (req, res) => {
+  try {
+    const { fromIndex, toIndex } = req.body;
+    
+    if (typeof fromIndex !== 'number' || typeof toIndex !== 'number') {
+      return res.status(400).json({ error: 'fromIndex and toIndex must be numbers' });
+    }
+    
+    const data = await loadAlbums();
+    
+    if (fromIndex < 0 || fromIndex >= data.albums.length || toIndex < 0 || toIndex >= data.albums.length) {
+      return res.status(400).json({ error: 'Index out of bounds' });
+    }
+    
+    // Remove album from old position and insert at new position
+    const [movedAlbum] = data.albums.splice(fromIndex, 1);
+    data.albums.splice(toIndex, 0, movedAlbum);
+    
+    await saveAlbums(data);
+    
+    // Restart Hugo to pick up new order
+    restartHugoServer().catch(error => {
+      console.error('Error restarting Hugo server:', error);
+    });
+    
+    res.json({ success: true, albums: data.albums });
+  } catch (error) {
+    console.error('Error reordering albums:', error);
+    res.status(500).json({ error: 'Failed to reorder albums' });
+  }
+});
+
 // Create new album
 app.post('/api/albums', async (req, res) => {
   try {
