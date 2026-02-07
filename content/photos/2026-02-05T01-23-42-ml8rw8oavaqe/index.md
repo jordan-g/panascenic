@@ -6,9 +6,13 @@ photoDate = "2018-04-21"
 camera = "iPhone"
 
 [location]
-name = "Allan Gardens, 160, Toronto Centre, Toronto, Golden Horseshoe, Ontario, M5A 2P2, Canada"
+name = "Allan Gardens, Toronto, Ontario, Canada"
 lat = 43.6617119
 lng = -79.3744096
+placeName = "Allan Gardens"
+city = "Toronto"
+state = "Ontario"
+country = "Canada"
 
 [thumbnailCrop]
 x = 0
