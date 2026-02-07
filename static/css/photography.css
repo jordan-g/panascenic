@@ -1,34 +1,29 @@
-/* Font Face Declaration */
-@font-face {
-    font-family: 'Zeplin Variable';
-    src: url('../fonts/ZeplinVariable.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
+/* Fonts loaded via Adobe Fonts (Typekit) – jazzier (serif), komet (sans-serif) */
 
-@font-face {
-    font-family: 'Jazzier Trial';
-    src: url('../fonts/Jazzier_Trial_Rg.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
+/* Prevent FOUT: hide content until fonts are ready or timeout */
+html.wf-loading body {
+    visibility: hidden;
 }
-
-@font-face {
-    font-family: 'Komet Pro';
-    src: url('../fonts/KometProTRIAL-Light.otf') format('opentype');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
+html.wf-active body,
+html.wf-inactive body {
+    visibility: visible;
 }
-
-@font-face {
-    font-family: 'Komet Pro';
-    src: url('../fonts/KometProTRIAL-Bold.otf') format('opentype');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
+/* Smooth in when fonts are ready */
+html.wf-active body,
+html.wf-inactive body {
+    animation: wf-fade-in 0.15s ease-out;
+}
+@keyframes wf-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+/* Keep body opaque during loading so we don't flash fallback; opacity is applied only when revealing */
+html.wf-loading body {
+    opacity: 0;
+}
+html.wf-active body,
+html.wf-inactive body {
+    opacity: 1;
 }
 
 /* CSS Custom Properties for Light/Dark Mode */
@@ -93,7 +88,7 @@
 }
 
 body {
-    font-family: 'Komet Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "komet", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     line-height: 1.6;
     font-weight: 300;
     color: var(--text-color);
@@ -185,7 +180,7 @@ body {
 }
 
 .site-title {
-    font-family: 'Jazzier Trial', sans-serif;
+    font-family: "jazzier", serif;
     font-size: 1.5rem;
     font-weight: normal;
     padding-bottom: 1rem;
@@ -216,7 +211,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    font-family: 'Komet Pro', sans-serif;
+    font-family: "komet", sans-serif;
     font-weight: 700;
     color: var(--text-color);
     text-decoration: none;
@@ -245,7 +240,7 @@ body {
 }
 
 .contact-link {
-    font-family: 'Komet Pro', sans-serif;
+    font-family: "komet", sans-serif;
     font-weight: 300;
     color: var(--text-color);
     text-decoration: none;
@@ -1097,7 +1092,7 @@ a.photo-meta-item:hover {
 }
 
 .album-title {
-    font-family: 'Jazzier Trial', sans-serif;
+    font-family: "jazzier", serif;
     font-size: 2rem;
     font-weight: normal;
     color: var(--text-color);
@@ -1316,7 +1311,7 @@ a.photo-meta-item:hover {
 }
 
 .contact-title {
-    font-family: 'Jazzier Trial', sans-serif;
+    font-family: "jazzier", serif;
     font-size: 2.5rem;
     font-weight: normal;
     letter-spacing: 2px;
