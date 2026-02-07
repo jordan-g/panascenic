@@ -3,10 +3,6 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {{ if .Site.Params.favicon }}
-    <link rel="icon" type="image/png" href="/{{ .Site.Params.favicon }}">
-    <link rel="shortcut icon" type="image/png" href="/{{ .Site.Params.favicon }}">
-    {{ end }}
     <script>
         (function() {
             var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -31,6 +27,10 @@
       })(document);
     </script>
     <link rel="stylesheet" href="{{ "css/photography.css" | absURL }}">
+    {{ if .Site.Params.favicon }}
+    <link rel="icon" type="image/png" href="{{ "/" | relURL }}{{ .Site.Params.favicon }}">
+    <link rel="shortcut icon" type="image/png" href="{{ "/" | relURL }}{{ .Site.Params.favicon }}">
+    {{ end }}
     {{ block "head" . }}{{ end }}
 </head>
 <body>
