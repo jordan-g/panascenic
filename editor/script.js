@@ -125,6 +125,10 @@ let cropData = {
 // Crop aspect ratio (default 4:5, can be changed by user)
 let cropAspectMode = '4:5'; // '1:1', '4:5', '3:4', '9:16', '16:9', 'original', 'free'
 
+// Track whether the user has explicitly modified the thumbnail crop
+// (or if one already existed). Prevents auto-creating thumbnails on first save.
+let thumbnailCropModified = false;
+
 // Get current aspect ratio value based on mode
 function getCropAspectRatio() {
     if (cropAspectMode === 'free') return null; // Freeform - no constraint
@@ -1534,6 +1538,7 @@ async function editPost(slug) {
             // Initialize crop tool
             cropSection.style.display = 'block';
             removeThumbnailFlag = false;
+            thumbnailCropModified = !!(data.thumbnailCrop); // only true if thumbnail already exists
             if (removeThumbnailBtn) removeThumbnailBtn.classList.remove('active');
             initCropTool(data.image, data.thumbnailCrop || null);
         } else {
@@ -1587,6 +1592,7 @@ function showManagementView() {
     darkModePreview.style.display = 'none';
     removeDarkModeFlag = false;
     removeThumbnailFlag = false;
+    thumbnailCropModified = false;
     frameSection.style.display = 'none';
     resetFrameData();
     
@@ -1699,10 +1705,10 @@ async function updatePost() {
     formData.append('camera', cameraInput.value.trim());
     formData.append('location', currentLocation ? JSON.stringify(currentLocation) : '');
     
-    // Thumbnail: either remove it or send crop data
+    // Thumbnail: either remove it or send crop data (only if user explicitly modified it)
     if (removeThumbnailFlag) {
         formData.append('removeThumbnail', 'true');
-    } else if (cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
+    } else if (thumbnailCropModified && cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
         formData.append('thumbnailCrop', JSON.stringify({
             x: cropData.x,
             y: cropData.y,
@@ -2090,6 +2096,9 @@ function handleCropMove(e) {
 }
 
 function handleCropEnd(e) {
+    if (cropData.isDragging || cropData.isResizing) {
+        thumbnailCropModified = true;
+    }
     cropData.isDragging = false;
     cropData.isResizing = false;
     cropData.activeHandle = null;
@@ -2117,6 +2126,7 @@ let removeThumbnailFlag = false;
 // Reset crop button
 resetCropBtn.addEventListener('click', () => {
     removeThumbnailFlag = false;
+    thumbnailCropModified = true;
     resetCropToDefault();
     updateCropBox();
     updateCropPreview();
@@ -2140,6 +2150,7 @@ cropAspectOptions.querySelectorAll('.crop-aspect-btn').forEach(btn => {
         
         // Update aspect mode
         cropAspectMode = btn.dataset.aspect;
+        thumbnailCropModified = true;
         
         // Update hint text
         updateCropHint();
