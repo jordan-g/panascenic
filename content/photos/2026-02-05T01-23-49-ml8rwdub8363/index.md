@@ -1,5 +1,5 @@
 +++
-title = "Cape Town Penguins 2"
+title = "Cape Town penguins 2"
 date = "2026-02-05T01:23:50.439Z"
 draft = false
 camera = "Fujifilm X-T20"

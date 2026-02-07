@@ -113,46 +113,122 @@
     </div>
     {{ end }}
 
-    <div class="photo-grid">
-        {{/* Get gallery order from data file */}}
-        {{ $galleryOrder := .Site.Data.galleryOrder.order | default slice }}
-        {{ $hasCustomOrder := gt (len $galleryOrder) 0 }}
-        
-        {{/* Get all photos */}}
-        {{ $allPhotos := where .Site.RegularPages "Section" "photos" }}
-        
-        {{/* Sort photos by gallery order if custom order exists */}}
-        {{ $sortedPhotos := slice }}
-        {{ if $hasCustomOrder }}
-            {{/* First add photos in gallery order */}}
-            {{ range $galleryOrder }}
-                {{ $slug := . }}
-                {{ range $allPhotos }}
-                    {{ if eq (path.Base .File.Dir) $slug }}
-                        {{ $sortedPhotos = $sortedPhotos | append . }}
-                    {{ end }}
+    {{/* Get gallery order and highlighted items (slug + sizePercent) from data files */}}
+    {{ $galleryOrder := .Site.Data.galleryOrder.order | default slice }}
+    {{ $highlightedRaw := .Site.Data.highlightedPhotos | default dict }}
+    {{ $highlightedItems := slice }}
+    {{ if $highlightedRaw.items }}
+        {{ range $highlightedRaw.items }}
+            {{ $slug := .slug }}
+            {{ $pct := .sizePercent | default 200 }}
+            {{ range where $.Site.RegularPages "Section" "photos" }}
+                {{ if eq (path.Base .File.Dir) $slug }}
+                    {{ $highlightedItems = $highlightedItems | append (dict "Page" . "SizePercent" $pct) }}
                 {{ end }}
             {{ end }}
-            {{/* Then add any remaining photos not in the order (new photos) */}}
-            {{ range $allPhotos }}
-                {{ $photo := . }}
-                {{ $photoSlug := path.Base .File.Dir }}
-                {{ $inOrder := false }}
-                {{ range $galleryOrder }}
-                    {{ if eq . $photoSlug }}
-                        {{ $inOrder = true }}
-                    {{ end }}
-                {{ end }}
-                {{ if not $inOrder }}
-                    {{ $sortedPhotos = $sortedPhotos | append $photo }}
-                {{ end }}
-            {{ end }}
-        {{ else }}
-            {{/* No custom order - use default (by date) */}}
-            {{ $sortedPhotos = $allPhotos }}
         {{ end }}
-        
-        {{ range $sortedPhotos }}
+    {{ else }}
+        {{ $legacySlugs := $highlightedRaw.slugs | default slice }}
+        {{ range $legacySlugs }}
+            {{ $slug := . }}
+            {{ range where $.Site.RegularPages "Section" "photos" }}
+                {{ if eq (path.Base .File.Dir) $slug }}
+                    {{ $highlightedItems = $highlightedItems | append (dict "Page" . "SizePercent" 200) }}
+                {{ end }}
+            {{ end }}
+        {{ end }}
+    {{ end }}
+    {{ $highlightedSlugs := slice }}
+    {{ range $highlightedItems }}
+        {{ $highlightedSlugs = $highlightedSlugs | append (path.Base .Page.File.Dir) }}
+    {{ end }}
+    {{ $hasCustomOrder := gt (len $galleryOrder) 0 }}
+    {{ $allPhotos := where .Site.RegularPages "Section" "photos" }}
+    
+    {{/* Build sorted photo list (same as before) */}}
+    {{ $sortedPhotos := slice }}
+    {{ if $hasCustomOrder }}
+        {{ range $galleryOrder }}
+            {{ $slug := . }}
+            {{ range $allPhotos }}
+                {{ if eq (path.Base .File.Dir) $slug }}
+                    {{ $sortedPhotos = $sortedPhotos | append . }}
+                {{ end }}
+            {{ end }}
+        {{ end }}
+        {{ range $allPhotos }}
+            {{ $photo := . }}
+            {{ $photoSlug := path.Base .File.Dir }}
+            {{ $inOrder := false }}
+            {{ range $galleryOrder }}
+                {{ if eq . $photoSlug }}{{ $inOrder = true }}{{ end }}
+            {{ end }}
+            {{ if not $inOrder }}
+                {{ $sortedPhotos = $sortedPhotos | append $photo }}
+            {{ end }}
+        {{ end }}
+    {{ else }}
+        {{ $sortedPhotos = $allPhotos }}
+    {{ end }}
+    
+    {{/* Remaining list (non-highlighted) */}}
+    {{ $remainingPhotos := slice }}
+    {{ range $sortedPhotos }}
+        {{ if not (in $highlightedSlugs (path.Base .File.Dir)) }}
+            {{ $remainingPhotos = $remainingPhotos | append . }}
+        {{ end }}
+    {{ end }}
+    
+    {{/* Highlighted section: up to 5 photos, per-photo size %, at top */}}
+    {{ if gt (len $highlightedItems) 0 }}
+    <div class="photo-grid photo-grid-highlighted">
+        {{ range $highlightedItems }}
+        {{ $page := .Page }}
+        {{ $sizePercent := .SizePercent }}
+        {{ $tags := $page.Params.tags | default (slice) }}
+        {{ $tagsLower := slice }}
+        {{ range $tags }}{{ $tagsLower = $tagsLower | append (lower .) }}{{ end }}
+        {{ $darkImage := $page.Resources.GetMatch "image-dark.*" }}
+        {{ $customThumbnail := $page.Resources.GetMatch "thumbnail.*" }}
+        {{ $image := "" }}
+        {{ range $page.Resources.ByType "image" }}
+            {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
+                {{ $image = . }}
+            {{ end }}
+        {{ end }}
+        {{ $thumbnailSrc := "" }}
+        {{ $thumbnailSrcDark := "" }}
+        {{ if $customThumbnail }}
+            {{ $thumbnailSrc = $customThumbnail.RelPermalink }}
+        {{ else if $image }}
+            {{ $thumb := $image.Fit "2000x2000" }}
+            {{ $thumbnailSrc = $thumb.RelPermalink }}
+        {{ else if $page.Params.image }}
+            {{ $thumbnailSrc = $page.Params.image | relURL }}
+        {{ end }}
+        {{ if $darkImage }}
+            {{ $darkThumb := $darkImage.Fit "2000x2000" }}
+            {{ $thumbnailSrcDark = $darkThumb.RelPermalink }}
+        {{ end }}
+        {{ $scale := div $sizePercent 100 }}
+        <article class="photo-item photo-item-highlighted" style="--highlight-scale: {{ $scale }};" data-slug="{{ path.Base $page.File.Dir }}" data-tags="{{ delimit $tagsLower "," }}"{{ if $thumbnailSrcDark }} data-dark-src="{{ $thumbnailSrcDark }}"{{ end }}>
+            <a href="{{ $page.RelPermalink }}" class="photo-link">
+                {{ if $thumbnailSrc }}
+                    <img src="{{ $thumbnailSrc }}" alt="{{ $page.Title }}" class="photo-thumbnail" loading="eager">
+                {{ end }}
+                {{ if $page.Title }}
+                <div class="photo-overlay">
+                    <h2 class="photo-title">{{ $page.Title }}</h2>
+                </div>
+                {{ end }}
+            </a>
+        </article>
+        {{ end }}
+    </div>
+    {{ end }}
+    
+    <div class="photo-grid">
+        {{ range $remainingPhotos }}
         {{ $tags := .Params.tags | default (slice) }}
         {{ $tagsLower := slice }}
         {{ range $tags }}

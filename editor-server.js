@@ -636,6 +636,7 @@ app.get('/api/posts', async (req, res) => {
             slug: entry.name,
             title: frontmatter.title || '',
             date: frontmatter.date || '',
+            photoDate: frontmatter.photoDate || '',
             draft: frontmatter.draft || false,
             tags: frontmatter.tags || [],
             description: body.trim(),
@@ -658,6 +659,7 @@ app.get('/api/posts', async (req, res) => {
           slug: slug,
           title: frontmatter.title || '',
           date: frontmatter.date || '',
+          photoDate: frontmatter.photoDate || '',
           draft: frontmatter.draft || false,
           tags: frontmatter.tags || [],
           description: body.trim(),
@@ -666,10 +668,10 @@ app.get('/api/posts', async (req, res) => {
       }
     }
     
-    // Sort by date (newest first)
+    // Sort by photo date when set, else date created (newest first)
     posts.sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
+      const dateA = new Date(a.photoDate || a.date);
+      const dateB = new Date(b.photoDate || b.date);
       return dateB - dateA;
     });
     
@@ -756,7 +758,7 @@ app.get('/api/posts/:slug', async (req, res) => {
 app.put('/api/posts/:slug', uploadFields, async (req, res) => {
   try {
     const { slug } = req.params;
-    const { title, description, tags, draft, thumbnailCrop, frame, removeDarkMode, photoDate, camera, location } = req.body;
+    const { title, description, tags, draft, thumbnailCrop, frame, removeDarkMode, removeThumbnail, photoDate, camera, location, date } = req.body;
     const photoFile = req.files && req.files['photo'] ? req.files['photo'][0] : null;
     const darkModeFile = req.files && req.files['darkModePhoto'] ? req.files['darkModePhoto'][0] : null;
     
@@ -893,6 +895,15 @@ app.put('/api/posts/:slug', uploadFields, async (req, res) => {
       }
     }
     
+    // Update post date (for sorting/display)
+    if (date !== undefined) {
+      if (date && date.trim()) {
+        frontmatter.date = date.trim();
+      } else {
+        delete frontmatter.date;
+      }
+    }
+    
     // Update photo date (when the photo was taken)
     if (photoDate !== undefined) {
       if (photoDate && photoDate.trim()) {
@@ -931,6 +942,16 @@ app.put('/api/posts/:slug', uploadFields, async (req, res) => {
         }
       } catch (parseError) {
         console.error('Error parsing location data:', parseError);
+      }
+    }
+    
+    // Handle thumbnail removal
+    if (removeThumbnail === 'true' && isDirectory) {
+      delete frontmatter.thumbnailCrop;
+      const oldThumbnail = await findThumbnailFile(postDir);
+      if (oldThumbnail) {
+        await fs.remove(path.join(postDir, oldThumbnail));
+        console.log('Removed thumbnail');
       }
     }
     
@@ -1630,6 +1651,65 @@ app.put('/api/gallery-order', async (req, res) => {
   } catch (error) {
     console.error('Error saving gallery order:', error);
     res.status(500).json({ error: 'Failed to save gallery order' });
+  }
+});
+
+// ========== Highlighted Photos API (gallery featured/pinned, max 5) ==========
+
+const highlightedPhotosPath = path.join(__dirname, 'data', 'highlightedPhotos.json');
+const MAX_HIGHLIGHTED = 5;
+
+function normalizeHighlightedItems(parsed) {
+  if (Array.isArray(parsed.items)) {
+    return parsed.items.slice(0, MAX_HIGHLIGHTED).map((it) => ({
+      slug: it.slug,
+      sizePercent: typeof it.sizePercent === 'number' ? Math.min(500, Math.max(100, it.sizePercent)) : 200
+    }));
+  }
+  if (Array.isArray(parsed.slugs)) {
+    return parsed.slugs.slice(0, MAX_HIGHLIGHTED).map((slug) => ({ slug, sizePercent: 200 }));
+  }
+  return [];
+}
+
+app.get('/api/highlighted-photos', async (req, res) => {
+  try {
+    await fs.ensureDir(path.dirname(highlightedPhotosPath));
+    if (await fs.pathExists(highlightedPhotosPath)) {
+      const data = await fs.readFile(highlightedPhotosPath, 'utf-8');
+      const parsed = JSON.parse(data);
+      const items = normalizeHighlightedItems(parsed);
+      res.json({ items });
+    } else {
+      res.json({ items: [] });
+    }
+  } catch (error) {
+    console.error('Error loading highlighted photos:', error);
+    res.status(500).json({ error: 'Failed to load highlighted photos' });
+  }
+});
+
+app.put('/api/highlighted-photos', async (req, res) => {
+  try {
+    let { items } = req.body;
+    if (Array.isArray(req.body.slugs)) {
+      items = req.body.slugs.map((slug) => ({ slug, sizePercent: 200 }));
+    }
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'items must be an array (or slugs for legacy)' });
+    }
+    const normalized = items.slice(0, MAX_HIGHLIGHTED).map((it) => ({
+      slug: it.slug,
+      sizePercent: typeof it.sizePercent === 'number' ? Math.min(500, Math.max(100, it.sizePercent)) : 200
+    }));
+    await fs.ensureDir(path.dirname(highlightedPhotosPath));
+    await fs.writeFile(highlightedPhotosPath, JSON.stringify({ items: normalized }, null, 2));
+    console.log(`Saved highlighted photos: ${normalized.length}`);
+    debouncedHugoRestart();
+    res.json({ success: true, items: normalized });
+  } catch (error) {
+    console.error('Error saving highlighted photos:', error);
+    res.status(500).json({ error: 'Failed to save highlighted photos' });
   }
 });
 

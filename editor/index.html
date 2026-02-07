@@ -157,6 +157,12 @@
                             </svg>
                             Gallery Order
                         </button>
+                        <button id="highlightedPhotosBtn" class="btn btn-secondary" title="Edit photos shown at top of gallery">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                            Highlighted
+                        </button>
                     </div>
 
                     <!-- Filters Row -->
@@ -311,6 +317,7 @@
                                     </div>
                                     <div class="crop-actions">
                                         <button type="button" id="resetCropBtn" class="btn btn-secondary btn-sm">Reset</button>
+                                        <button type="button" id="removeThumbnailBtn" class="btn btn-secondary btn-sm">Remove thumbnail</button>
                                     </div>
                                 </div>
                             </div>
@@ -683,6 +690,27 @@
                 </form>
             </div>
         </main>
+    </div>
+
+    <!-- Highlighted Photos Modal (admin only) -->
+    <div id="highlightedPhotosModal" class="modal" style="display: none;">
+        <div class="modal-content modal-content-md">
+            <div class="modal-header">
+                <h3>Highlighted Photos</h3>
+                <button type="button" id="closeHighlightedModalBtn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="highlighted-modal-hint">Up to 5 photos at the top of your gallery. Set size % (vs normal grid item); default 200%. Drag to reorder.</p>
+                <div id="highlightedPhotosList" class="highlighted-photos-list"></div>
+                <div id="highlightedAddSection" class="highlighted-add-section" style="display: none;">
+                    <label class="highlighted-add-label">Add photo</label>
+                    <div id="highlightedAvailableGrid" class="highlighted-available-grid"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="doneHighlightedBtn" class="btn btn-primary">Done</button>
+            </div>
+        </div>
     </div>
 
     <!-- Photo Selection Modal for Albums -->

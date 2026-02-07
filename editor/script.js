@@ -54,6 +54,7 @@ const cropImage = document.getElementById('cropImage');
 const cropBox = document.getElementById('cropBox');
 const cropPreview = document.getElementById('cropPreview');
 const resetCropBtn = document.getElementById('resetCropBtn');
+const removeThumbnailBtn = document.getElementById('removeThumbnailBtn');
 const cropAspectOptions = document.getElementById('cropAspectOptions');
 const cropHint = document.getElementById('cropHint');
 const darkModeSection = document.getElementById('darkModeSection');
@@ -390,9 +391,10 @@ function filterPosts(posts) {
             }
         }
         
-        // Date range filter
+        // Date range filter (uses photo date when set, else date created)
         if (currentFilters.dateFrom || currentFilters.dateTo) {
-            const postDate = post.date ? new Date(post.date) : null;
+            const dateForFilter = post.photoDate || post.date;
+            const postDate = dateForFilter ? new Date(dateForFilter) : null;
             if (!postDate) {
                 return false; // No date means it doesn't match date filter
             }
@@ -723,6 +725,201 @@ if (exitGalleryOrderBtn) {
     exitGalleryOrderBtn.addEventListener('click', exitGalleryOrderMode);
 }
 
+// ========== Highlighted Photos (admin: pin up to 5 at top of gallery) ==========
+
+const MAX_HIGHLIGHTED = 5;
+let highlightedPhotosItems = []; // { slug, sizePercent }[], sizePercent default 200
+
+const highlightedPhotosModal = document.getElementById('highlightedPhotosModal');
+const highlightedPhotosList = document.getElementById('highlightedPhotosList');
+const highlightedAddSection = document.getElementById('highlightedAddSection');
+const highlightedAvailableGrid = document.getElementById('highlightedAvailableGrid');
+const highlightedPhotosBtn = document.getElementById('highlightedPhotosBtn');
+const closeHighlightedModalBtn = document.getElementById('closeHighlightedModalBtn');
+const doneHighlightedBtn = document.getElementById('doneHighlightedBtn');
+
+async function loadHighlightedPhotosFromServer() {
+    try {
+        const response = await fetch('/api/highlighted-photos');
+        const data = await response.json();
+        if (Array.isArray(data.items)) return data.items;
+        if (Array.isArray(data.slugs)) return data.slugs.map(slug => ({ slug, sizePercent: 200 }));
+        return [];
+    } catch (e) {
+        console.error('Error loading highlighted photos:', e);
+        return [];
+    }
+}
+
+async function saveHighlightedPhotosToServer(items) {
+    try {
+        const response = await fetch('/api/highlighted-photos', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        return response.ok;
+    } catch (e) {
+        console.error('Error saving highlighted photos:', e);
+        return false;
+    }
+}
+
+function getPostBySlug(slug) {
+    return currentPosts.find(p => p.slug === slug) || allPosts.find(p => p.slug === slug);
+}
+
+function renderHighlightedList() {
+    const slugs = highlightedPhotosItems.map(it => it.slug);
+    const posts = highlightedPhotosItems.map(it => ({ ...getPostBySlug(it.slug), sizePercent: it.sizePercent })).filter(p => p.slug);
+    highlightedPhotosList.innerHTML = posts.map((post, index) => {
+        const thumb = post.thumbnail || post.image || '';
+        const title = post.title || post.slug || 'Untitled';
+        const pct = Math.min(500, Math.max(100, Number(post.sizePercent) || 200));
+        return `
+            <div class="highlighted-photo-card" data-slug="${post.slug}" data-index="${index}" draggable="true">
+                <div class="highlighted-photo-drag-handle" title="Drag to reorder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="5" r="1.5"></circle>
+                        <circle cx="9" cy="12" r="1.5"></circle>
+                        <circle cx="9" cy="19" r="1.5"></circle>
+                        <circle cx="15" cy="5" r="1.5"></circle>
+                        <circle cx="15" cy="12" r="1.5"></circle>
+                        <circle cx="15" cy="19" r="1.5"></circle>
+                    </svg>
+                </div>
+                <div class="highlighted-photo-thumb">
+                    ${thumb ? `<img src="${thumb}" alt="">` : '<span class="no-thumb">No image</span>'}
+                </div>
+                <span class="highlighted-photo-title">${escapeHtml(title)}</span>
+                <label class="highlighted-size-label" title="Size vs normal grid item (100% = same size)">
+                    <input type="number" class="highlighted-size-input" value="${pct}" min="100" max="500" step="10" data-slug="${post.slug}">%
+                </label>
+                <button type="button" class="highlighted-photo-remove" title="Remove">×</button>
+            </div>`;
+    }).join('');
+
+    if (highlightedPhotosItems.length < MAX_HIGHLIGHTED) {
+        highlightedAddSection.style.display = 'block';
+        const available = (currentPosts.length ? currentPosts : allPosts).filter(p => !slugs.includes(p.slug));
+        highlightedAvailableGrid.innerHTML = available.map(post => {
+            const thumb = post.thumbnail || post.image || '';
+            const title = post.title || post.slug || 'Untitled';
+            return `
+                <button type="button" class="highlighted-available-item" data-slug="${post.slug}" title="${escapeHtml(title)}">
+                    ${thumb ? `<img src="${thumb}" alt="">` : '<span>+</span>'}
+                </button>`;
+        }).join('');
+        highlightedAvailableGrid.querySelectorAll('.highlighted-available-item').forEach(btn => {
+            btn.addEventListener('click', () => addHighlightedPhoto(btn.dataset.slug));
+        });
+    } else {
+        highlightedAddSection.style.display = 'none';
+    }
+
+    // Attach remove, drag, and size input
+    highlightedPhotosList.querySelectorAll('.highlighted-photo-card').forEach(card => {
+        card.querySelector('.highlighted-photo-remove').addEventListener('click', () => removeHighlightedPhoto(card.dataset.slug));
+        const sizeInput = card.querySelector('.highlighted-size-input');
+        if (sizeInput) {
+            sizeInput.addEventListener('change', () => {
+                const val = parseInt(sizeInput.value, 10);
+                if (!isNaN(val)) setHighlightedSize(card.dataset.slug, Math.min(500, Math.max(100, val)));
+            });
+        }
+        card.addEventListener('dragstart', handleHighlightedDragStart);
+        card.addEventListener('dragover', handleHighlightedDragOver);
+        card.addEventListener('drop', handleHighlightedDrop);
+        card.addEventListener('dragend', handleHighlightedDragEnd);
+    });
+}
+
+function setHighlightedSize(slug, sizePercent) {
+    const it = highlightedPhotosItems.find(i => i.slug === slug);
+    if (it) it.sizePercent = sizePercent;
+}
+
+function addHighlightedPhoto(slug) {
+    if (highlightedPhotosItems.length >= MAX_HIGHLIGHTED || highlightedPhotosItems.some(i => i.slug === slug)) return;
+    highlightedPhotosItems.push({ slug, sizePercent: 200 });
+    renderHighlightedList();
+}
+
+function removeHighlightedPhoto(slug) {
+    highlightedPhotosItems = highlightedPhotosItems.filter(i => i.slug !== slug);
+    renderHighlightedList();
+}
+
+let highlightedDragSrc = null;
+
+function handleHighlightedDragStart(e) {
+    highlightedDragSrc = e.currentTarget;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.index);
+    e.currentTarget.classList.add('dragging');
+}
+
+function handleHighlightedDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const card = e.currentTarget;
+    if (card !== highlightedDragSrc) card.classList.add('drag-over');
+}
+
+function handleHighlightedDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    highlightedPhotosList.querySelectorAll('.highlighted-photo-card').forEach(c => c.classList.remove('drag-over'));
+    highlightedDragSrc = null;
+}
+
+function handleHighlightedDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (!highlightedDragSrc) return;
+    const fromIndex = parseInt(highlightedDragSrc.dataset.index);
+    const toIndex = parseInt(e.currentTarget.dataset.index);
+    if (fromIndex === toIndex) return;
+    const [moved] = highlightedPhotosItems.splice(fromIndex, 1);
+    highlightedPhotosItems.splice(toIndex, 0, moved);
+    renderHighlightedList();
+}
+
+async function openHighlightedModal() {
+    // Ensure posts are loaded first so thumbnails resolve
+    if (currentPosts.length === 0 && allPosts.length === 0) {
+        try {
+            const res = await fetch('/api/posts');
+            if (res.ok) {
+                const list = await res.json();
+                allPosts = list.posts || list || [];
+            }
+        } catch (e) { console.error('Error loading posts for highlighted modal:', e); }
+    }
+    highlightedPhotosItems = await loadHighlightedPhotosFromServer();
+    renderHighlightedList();
+    if (highlightedPhotosModal) highlightedPhotosModal.style.display = 'flex';
+}
+
+function closeHighlightedModal() {
+    if (highlightedPhotosModal) highlightedPhotosModal.style.display = 'none';
+}
+
+async function doneHighlightedModal() {
+    const ok = await saveHighlightedPhotosToServer(highlightedPhotosItems);
+    closeHighlightedModal();
+    if (ok) showListMessage('Highlighted photos saved', 'success');
+    else showListMessage('Failed to save highlighted photos', 'error');
+}
+
+if (highlightedPhotosBtn) highlightedPhotosBtn.addEventListener('click', openHighlightedModal);
+if (closeHighlightedModalBtn) closeHighlightedModalBtn.addEventListener('click', closeHighlightedModal);
+if (doneHighlightedBtn) doneHighlightedBtn.addEventListener('click', doneHighlightedModal);
+if (highlightedPhotosModal) {
+    highlightedPhotosModal.addEventListener('click', e => {
+        if (e.target === highlightedPhotosModal) closeHighlightedModal();
+    });
+}
+
 // Close sort menu when clicking outside
 document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('sortDropdown');
@@ -789,7 +986,17 @@ function renderPosts(posts) {
                            onkeydown="handleInlineKeydown(event, this)">
                 `}
                 <div class="post-meta">
-                    <span class="post-date">${formatDate(post.date)}</span>
+                    ${isSelectMode || isGalleryOrderMode ? `
+                        <span class="post-date">${formatDate(post.photoDate || post.date)}</span>
+                    ` : `
+                        <input type="date" 
+                               class="inline-edit-date" 
+                               value="${toDateInputValue(post.photoDate || post.date)}" 
+                               data-slug="${post.slug}"
+                               data-field="photoDate"
+                               onchange="saveInlineField(this)"
+                               onblur="saveInlineField(this)">
+                    `}
                     ${post.draft ? '<span class="draft-badge">Draft</span>' : ''}
                 </div>
             </div>
@@ -1073,6 +1280,7 @@ function enterSelectMode() {
     cancelSelectBtn.style.display = 'inline-flex';
     if (addToAlbumBtn) addToAlbumBtn.style.display = 'none'; // Will show when photos selected
     if (galleryOrderBtn) galleryOrderBtn.style.display = 'none';
+    if (highlightedPhotosBtn) highlightedPhotosBtn.style.display = 'none';
     const bulkEditBtnEl = document.getElementById('bulkEditBtn');
     if (bulkEditBtnEl) bulkEditBtnEl.style.display = 'none'; // Will show when photos selected
     
@@ -1089,6 +1297,7 @@ function exitSelectMode() {
     cancelSelectBtn.style.display = 'none';
     if (addToAlbumBtn) addToAlbumBtn.style.display = 'none';
     if (galleryOrderBtn) galleryOrderBtn.style.display = 'inline-flex';
+    if (highlightedPhotosBtn) highlightedPhotosBtn.style.display = 'inline-flex';
     const bulkEditBtnEl = document.getElementById('bulkEditBtn');
     if (bulkEditBtnEl) bulkEditBtnEl.style.display = 'none';
     
@@ -1304,7 +1513,7 @@ async function editPost(slug) {
         photoDateGroup.style.display = 'block';
         cameraGroup.style.display = 'block';
         locationGroup.style.display = 'block';
-        photoDateInput.value = data.photoDate || '';
+        photoDateInput.value = toDateInputValue(data.photoDate || '') || '';
         cameraInput.value = data.camera || '';
         
         // Populate location if exists
@@ -1324,6 +1533,8 @@ async function editPost(slug) {
             
             // Initialize crop tool
             cropSection.style.display = 'block';
+            removeThumbnailFlag = false;
+            if (removeThumbnailBtn) removeThumbnailBtn.classList.remove('active');
             initCropTool(data.image, data.thumbnailCrop || null);
         } else {
             currentImageContainer.style.display = 'none';
@@ -1375,6 +1586,7 @@ function showManagementView() {
     darkModeFileText.textContent = 'Choose dark mode image';
     darkModePreview.style.display = 'none';
     removeDarkModeFlag = false;
+    removeThumbnailFlag = false;
     frameSection.style.display = 'none';
     resetFrameData();
     
@@ -1487,8 +1699,10 @@ async function updatePost() {
     formData.append('camera', cameraInput.value.trim());
     formData.append('location', currentLocation ? JSON.stringify(currentLocation) : '');
     
-    // Add crop data (normalized coordinates + aspect mode)
-    if (cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
+    // Thumbnail: either remove it or send crop data
+    if (removeThumbnailFlag) {
+        formData.append('removeThumbnail', 'true');
+    } else if (cropSection.style.display !== 'none' && cropData.width > 0 && cropData.height > 0) {
         formData.append('thumbnailCrop', JSON.stringify({
             x: cropData.x,
             y: cropData.y,
@@ -1610,6 +1824,23 @@ function formatDate(dateString) {
         });
     } catch (e) {
         return dateString;
+    }
+}
+
+function toDateInputValue(dateString) {
+    if (!dateString) return '';
+    const s = String(dateString).trim();
+    // Treat YYYY-MM-DD (and ISO strings starting with it) as calendar date only — no timezone shift
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+    try {
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return '';
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    } catch (e) {
+        return '';
     }
 }
 
@@ -1880,12 +2111,25 @@ cropWrapper.querySelectorAll('.crop-handle').forEach(handle => {
     handle.addEventListener('touchstart', handleCropStart, { passive: false });
 });
 
+// Remove thumbnail flag (cleared when opening edit or clicking Reset)
+let removeThumbnailFlag = false;
+
 // Reset crop button
 resetCropBtn.addEventListener('click', () => {
+    removeThumbnailFlag = false;
     resetCropToDefault();
     updateCropBox();
     updateCropPreview();
+    if (removeThumbnailBtn) removeThumbnailBtn.classList.remove('active');
 });
+
+// Remove thumbnail button
+if (removeThumbnailBtn) {
+    removeThumbnailBtn.addEventListener('click', () => {
+        removeThumbnailFlag = true;
+        removeThumbnailBtn.classList.add('active');
+    });
+}
 
 // Crop aspect ratio buttons
 cropAspectOptions.querySelectorAll('.crop-aspect-btn').forEach(btn => {

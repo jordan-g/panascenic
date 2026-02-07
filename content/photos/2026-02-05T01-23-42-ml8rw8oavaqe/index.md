@@ -1,5 +1,5 @@
 +++
-title = "At the Gardens 4"
+title = "at the gardens 4"
 date = "2026-02-05T01:23:43.351Z"
 draft = false
 photoDate = "2018-04-21"

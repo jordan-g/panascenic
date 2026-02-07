@@ -2,6 +2,7 @@
 title = "Roshko 2"
 date = "2026-02-05T01:24:04.670Z"
 draft = false
+photoDate = "2021-08-27"
 
 [location]
 name = "Bulgaria"

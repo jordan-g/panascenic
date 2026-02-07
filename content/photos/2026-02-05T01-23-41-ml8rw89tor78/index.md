@@ -1,5 +1,5 @@
 +++
-title = "Cape Town Penguins 3"
+title = "Cape Town penguins 3"
 date = "2026-02-05T01:23:42.434Z"
 draft = false
 photoDate = "2018-01-21"

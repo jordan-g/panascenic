@@ -144,21 +144,44 @@ body {
 }
 
 .header-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    gap: 0 1rem;
+}
+
+.header-left {
+    grid-column: 1;
+    grid-row: 1;
 }
 
 .header-controls {
+    grid-column: 2;
+    grid-row: 1;
     display: flex;
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
 }
 
-.header-left {
-    flex: 1;
+.header-caption {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+}
+
+.header-contact {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    justify-content: flex-end;
+    align-self: center;
+}
+
+.header-links-left {
+    grid-column: 1;
+    grid-row: 3;
 }
 
 .site-title {
@@ -221,6 +244,21 @@ body {
     opacity: 0.7;
 }
 
+.contact-link {
+    font-family: 'Komet Pro', sans-serif;
+    font-weight: 300;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.8rem;
+    transition: opacity 0.3s;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+.contact-link:hover {
+    opacity: 0.7;
+}
+
 /* Filter Toggle Button */
 .filter-toggle {
     display: none;
@@ -272,13 +310,13 @@ body {
     transform: scale(1.1);
 }
 
-/* Theme Toggle Button */
+/* Theme Toggle Button - hidden, theme follows system/saved preference */
 .theme-toggle {
+    display: none !important;
     background: none;
     border: none;
     cursor: pointer;
     padding: 0.5rem;
-    display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-color);
@@ -359,6 +397,57 @@ body {
     align-items: center;
 }
 
+/* Highlighted / pinned photos at top – up to 5, per-photo scale, centered */
+.photo-grid-highlighted {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0 0.5rem;
+    margin-bottom: 0;
+}
+/* 200% = reference size (~440px); 100% = half, 400% = double */
+.photo-item-highlighted {
+    --highlight-scale: 1;
+    flex: 0 0 auto;
+    width: calc(var(--highlight-scale) * 330px);
+    max-width: calc(var(--highlight-scale) * 330px);
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.photo-item-highlighted .photo-link {
+    display: inline-block;
+    position: relative;
+    max-width: 100%;
+}
+.photo-item-highlighted .photo-thumbnail {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.15),
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        0 16px 40px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+/* Slight rotations for highlighted photos (match regular gallery style) */
+.photo-item-highlighted:nth-child(5n+1) .photo-thumbnail { transform: rotate(-0.6deg); }
+.photo-item-highlighted:nth-child(5n+2) .photo-thumbnail { transform: rotate(0.4deg); }
+.photo-item-highlighted:nth-child(5n+3) .photo-thumbnail { transform: rotate(-0.25deg); }
+.photo-item-highlighted:nth-child(5n+4) .photo-thumbnail { transform: rotate(0.7deg); }
+.photo-item-highlighted:nth-child(5n+5) .photo-thumbnail { transform: rotate(-0.45deg); }
+.photo-item-highlighted .photo-link:hover .photo-thumbnail {
+    box-shadow:
+        0 6px 16px rgba(0, 0, 0, 0.18),
+        0 12px 32px rgba(0, 0, 0, 0.15),
+        0 20px 48px rgba(0, 0, 0, 0.1);
+    transform: rotate(0deg) translateY(-2px);
+}
+
 /* Add more columns when screen is wide enough */
 @media (min-width: 1200px) {
     .photo-grid {
@@ -384,6 +473,11 @@ body {
         gap: 0.25rem;
     }
     
+    .photo-item-highlighted {
+        width: calc(var(--highlight-scale) * 20vw);
+        padding: 1rem;
+    }
+    
     .photo-item {
         padding: 0.75rem;
     }
@@ -402,6 +496,11 @@ body {
     .photo-grid {
         grid-template-columns: 1fr;
         gap: 0.25rem;
+    }
+    
+    .photo-item-highlighted {
+        width: calc(var(--highlight-scale) * 30vw);
+        padding: 0.75rem;
     }
     
     .photo-item {
@@ -445,16 +544,17 @@ body {
     transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
-/* Slight random rotations for gallery photos */
-.photo-item:nth-child(7n+1) .photo-thumbnail { transform: rotate(-0.6deg); }
-.photo-item:nth-child(7n+2) .photo-thumbnail { transform: rotate(0.4deg); }
-.photo-item:nth-child(7n+3) .photo-thumbnail { transform: rotate(-0.25deg); }
-.photo-item:nth-child(7n+4) .photo-thumbnail { transform: rotate(0.7deg); }
-.photo-item:nth-child(7n+5) .photo-thumbnail { transform: rotate(-0.45deg); }
-.photo-item:nth-child(7n+6) .photo-thumbnail { transform: rotate(0.2deg); }
-.photo-item:nth-child(7n+7) .photo-thumbnail { transform: rotate(-0.8deg); }
+/* Slight random rotations for gallery photos (only in main grid, not highlighted) */
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+1) .photo-thumbnail { transform: rotate(-0.6deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+2) .photo-thumbnail { transform: rotate(0.4deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+3) .photo-thumbnail { transform: rotate(-0.25deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+4) .photo-thumbnail { transform: rotate(0.7deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+5) .photo-thumbnail { transform: rotate(-0.45deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+6) .photo-thumbnail { transform: rotate(0.2deg); }
+.photo-grid:not(.photo-grid-highlighted) .photo-item:nth-child(7n+7) .photo-thumbnail { transform: rotate(-0.8deg); }
 
-.photo-link:hover .photo-thumbnail {
+.photo-link:hover .photo-thumbnail,
+.photo-grid:not(.photo-grid-highlighted) .photo-item:hover .photo-thumbnail {
     box-shadow: 
         0 6px 16px rgba(0, 0, 0, 0.18),
         0 12px 32px rgba(0, 0, 0, 0.15),
@@ -467,7 +567,6 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(to top, var(--overlay-gradient-start), transparent);
     padding: 1.5rem 1rem 0.75rem;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -475,11 +574,23 @@ body {
     z-index: 102;
 }
 
+.photo-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, var(--overlay-gradient-start), transparent);
+    mix-blend-mode: multiply;
+    border-radius: 0 0 2px 2px;
+    z-index: -1;
+}
+
 .photo-link:hover .photo-overlay {
     opacity: 1;
 }
 
 .photo-overlay .photo-title {
+    position: relative;
+    z-index: 1;
     color: var(--overlay-text);
     font-size: 0.75rem;
     font-weight: 400;
@@ -1190,6 +1301,101 @@ a.photo-meta-item:hover {
     .album-layout-vertical[data-bg-color] {
         padding: 1.5rem 1rem;
         margin: 0 15px;
+    }
+}
+
+/* ========== Contact Page ========== */
+.contact-page {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2rem 0;
+}
+
+.contact-content {
+    text-align: center;
+}
+
+.contact-title {
+    font-family: 'Jazzier Trial', sans-serif;
+    font-size: 2.5rem;
+    font-weight: normal;
+    letter-spacing: 2px;
+    margin-bottom: 1.5rem;
+    color: var(--text-color);
+}
+
+.contact-intro {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--text-color-secondary);
+    margin-bottom: 3rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.contact-intro p {
+    margin: 0;
+}
+
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.contact-email-link,
+.contact-social-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 1.1rem;
+    padding: 1rem 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    min-width: 280px;
+    justify-content: center;
+}
+
+.contact-email-link:hover,
+.contact-social-link:hover {
+    background-color: var(--photo-bg);
+    border-color: var(--text-color-muted);
+    transform: translateY(-2px);
+}
+
+.contact-icon {
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.contact-email-link:hover .contact-icon,
+.contact-social-link:hover .contact-icon {
+    opacity: 1;
+}
+
+.contact-navigation {
+    text-align: center;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border-color);
+    margin-top: 4rem;
+    transition: border-color 0.3s ease;
+}
+
+/* Mobile adjustments for contact page */
+@media (max-width: 768px) {
+    .contact-title {
+        font-size: 2rem;
+    }
+    
+    .contact-email-link,
+    .contact-social-link {
+        min-width: 100%;
+        font-size: 1rem;
     }
 }
 

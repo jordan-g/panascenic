@@ -1,6 +1,7 @@
 +++
-title = 'Roshko 6'
-date = '2026-02-05T01:23:56.420Z'
+title = "Roshko 6"
+date = "2026-02-05T01:23:56.420Z"
 draft = false
+photoDate = "2024-10-02"
 +++
 

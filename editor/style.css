@@ -625,6 +625,44 @@ textarea {
     flex: 1;
 }
 
+.inline-edit-date {
+    flex: 1;
+    min-width: 0;
+    max-width: 10rem;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    padding: 0.15rem 0.25rem;
+    font-size: 0.7rem;
+    color: #95a5a6;
+    font-family: inherit;
+    background: transparent;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.inline-edit-date:hover {
+    border-color: #dfe6e9;
+    color: #2c3e50;
+}
+
+.inline-edit-date:focus {
+    outline: none;
+    border-color: var(--primary, #3498db);
+    color: #2c3e50;
+}
+
+.inline-edit-date.saving {
+    opacity: 0.7;
+}
+
+.inline-edit-date.saved {
+    color: #27ae60;
+}
+
+.inline-edit-date.error {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
 .draft-badge {
     background: #f39c12;
     color: white;
@@ -1054,13 +1092,81 @@ textarea {
     color: white;
 }
 
-/* Gallery order mode styling */
+/* Gallery order mode: compact photo grid */
+.posts-list.gallery-order-mode {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
 .posts-list.gallery-order-mode .post-card {
     border: 2px solid transparent;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    gap: 0;
 }
 
 .posts-list.gallery-order-mode .post-card:hover {
     border-color: #28a745;
+}
+
+.posts-list.gallery-order-mode .post-image {
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    aspect-ratio: 4/5;
+    border-radius: 6px 6px 0 0;
+}
+
+.posts-list.gallery-order-mode .post-image img {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+}
+
+.posts-list.gallery-order-mode .post-content {
+    padding: 0.35rem 0.5rem 0.5rem;
+}
+
+.posts-list.gallery-order-mode .post-title {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.posts-list.gallery-order-mode .post-description,
+.posts-list.gallery-order-mode .post-meta {
+    display: none;
+}
+
+.posts-list.gallery-order-mode .post-drag-handle {
+    top: 6px;
+    left: 6px;
+    width: 26px;
+    height: 26px;
+}
+
+.posts-list.gallery-order-mode .post-order-badge {
+    top: 6px;
+    right: 6px;
+    min-width: 22px;
+    height: 22px;
+    font-size: 11px;
+    padding: 0 5px;
+}
+
+/* Grid: single drop indicator (ring) instead of left/right lines */
+.posts-list.gallery-order-mode .post-card.drag-over-left,
+.posts-list.gallery-order-mode .post-card.drag-over-right {
+    box-shadow: 0 0 0 3px #28a745;
+}
+
+.posts-list.gallery-order-mode .post-card.drag-over-left::before,
+.posts-list.gallery-order-mode .post-card.drag-over-right::before {
+    display: none;
 }
 
 /* Position badge showing gallery order */
@@ -1585,6 +1691,12 @@ textarea {
     margin-top: 1rem;
     display: flex;
     gap: 0.75rem;
+}
+
+.crop-actions .btn.active {
+    border-color: #3498db;
+    background: #3498db;
+    color: white;
 }
 
 /* ========== Dark Mode Image Section ========== */
@@ -2441,6 +2553,148 @@ textarea {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+/* Highlighted Photos Modal */
+.highlighted-modal-hint {
+    margin: 0 0 1rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+.highlighted-photos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    min-height: 60px;
+}
+.highlighted-photo-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    cursor: grab;
+}
+.highlighted-photo-card:active {
+    cursor: grabbing;
+}
+.highlighted-photo-card.dragging {
+    opacity: 0.6;
+}
+.highlighted-photo-card.drag-over {
+    border-color: #3498db;
+    background: #e8f4fd;
+}
+.highlighted-photo-drag-handle {
+    color: #adb5bd;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.highlighted-photo-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #dee2e6;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.highlighted-photo-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.highlighted-photo-thumb .no-thumb {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+.highlighted-photo-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+.highlighted-size-label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+.highlighted-size-input {
+    width: 3.5rem;
+    padding: 0.2rem 0.35rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    text-align: right;
+}
+.highlighted-photo-remove {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #6c757d;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.highlighted-photo-remove:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.highlighted-add-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+.highlighted-available-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 0.5rem;
+}
+.highlighted-available-item {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid #e9ecef;
+    background: #f8f9fa;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+}
+.highlighted-available-item:hover {
+    border-color: #3498db;
+    background: #e8f4fd;
+}
+.highlighted-available-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.highlighted-available-item span {
+    font-size: 1.5rem;
+    color: #adb5bd;
 }
 
 /* Album Select List */
