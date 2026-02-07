@@ -6,9 +6,13 @@ photoDate = "2018-01-21"
 camera = "Fujifilm X-T20"
 
 [location]
-name = "Boulders Beach, The Boulders, Cape Town Ward 61, Simon's Town, City of Cape Town, Western Cape, South Africa"
+name = "Boulders Beach, Simon's Town, Western Cape, South Africa"
 lat = -34.1980484
 lng = 18.4523525
+placeName = "Boulders Beach"
+city = "Simon's Town"
+state = "Western Cape"
+country = "South Africa"
 
 [thumbnailCrop]
 x = 0
