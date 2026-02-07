@@ -1,5 +1,5 @@
 +++
-title = "so much snow"
+title = "snow dogs"
 date = "2026-02-07T00:47:17.943Z"
 layout = "horizontal"
 albumId = "mlblh4fryolzm"
