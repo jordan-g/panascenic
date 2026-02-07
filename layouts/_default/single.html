@@ -81,6 +81,70 @@
             {{ end }}
         </div>
         
+        {{/* === Related Photos === */}}
+        {{ $currentSlug := path.Base .File.Dir }}
+        {{ $relatedSlugs := slice }}
+
+        {{/* Find all albums containing this photo and collect other photo slugs */}}
+        {{ range .Site.Data.albums.albums }}
+            {{ $album := . }}
+            {{ $inAlbum := false }}
+            {{ range .photoSlugs }}
+                {{ if eq . $currentSlug }}
+                    {{ $inAlbum = true }}
+                {{ end }}
+            {{ end }}
+            {{ if $inAlbum }}
+                {{ range $album.photoSlugs }}
+                    {{ if ne . $currentSlug }}
+                        {{ $relatedSlugs = $relatedSlugs | append . }}
+                    {{ end }}
+                {{ end }}
+            {{ end }}
+        {{ end }}
+
+        {{/* Deduplicate slugs (photo may appear in multiple albums) */}}
+        {{ $relatedSlugs = $relatedSlugs | uniq }}
+
+        {{ if gt (len $relatedSlugs) 0 }}
+        <div class="related-photos">
+            <h2 class="related-photos-title">Related Photos</h2>
+            <div class="related-photos-row">
+                {{ range $relatedSlugs }}
+                    {{ $slug := . }}
+                    {{ range where $.Site.RegularPages "Section" "photos" }}
+                        {{ if eq (path.Base .File.Dir) $slug }}
+                            {{ $photo := . }}
+                            {{ $thumbnail := $photo.Resources.GetMatch "thumbnail.*" }}
+                            {{ $framedImage := $photo.Resources.GetMatch "image-framed.*" }}
+                            {{ $image := "" }}
+                            {{ range $photo.Resources.ByType "image" }}
+                                {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) (not (hasPrefix .Name "image-framed")) }}
+                                    {{ $image = . }}
+                                {{ end }}
+                            {{ end }}
+                            
+                            {{ $thumbSrc := "" }}
+                            {{ if $thumbnail }}
+                                {{ $thumbSrc = $thumbnail.RelPermalink }}
+                            {{ else if $framedImage }}
+                                {{ $thumbSrc = $framedImage.RelPermalink }}
+                            {{ else if $image }}
+                                {{ $thumbSrc = $image.RelPermalink }}
+                            {{ end }}
+                            
+                            {{ if $thumbSrc }}
+                            <a href="{{ $photo.RelPermalink }}" class="related-photo-item">
+                                <img src="{{ $thumbSrc }}" alt="{{ $photo.Title }}" class="related-photo-img" loading="lazy">
+                            </a>
+                            {{ end }}
+                        {{ end }}
+                    {{ end }}
+                {{ end }}
+            </div>
+        </div>
+        {{ end }}
+
         <div class="photo-navigation">
             <a href="{{ "/" | relURL }}" class="back-link">← Back to Gallery</a>
         </div>

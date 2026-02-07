@@ -684,6 +684,113 @@ a.photo-meta-item:hover {
     color: var(--text-color);
 }
 
+/* Related Photos Section */
+.related-photos {
+    max-width: 800px;
+    margin: 3rem auto 0;
+    padding: 0;
+    text-align: center;
+}
+
+.related-photos-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-color-muted);
+    text-align: center;
+    margin-bottom: 1.25rem;
+}
+
+.related-photos-row {
+    display: inline-flex;
+    gap: 0.75rem;
+    padding: 0.5rem 0 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 100%;
+}
+
+.related-photo-item {
+    flex-shrink: 0;
+    display: block;
+    text-decoration: none;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.related-photo-item:hover {
+    transform: translateY(-3px);
+}
+
+.related-photo-img {
+    width: auto;
+    height: 120px;
+    max-width: 160px;
+    display: block;
+    object-fit: cover;
+    border-radius: 3px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: box-shadow 0.2s ease;
+}
+
+.related-photo-item:hover .related-photo-img {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Dark mode adjustments for related photos */
+:root[data-theme="dark"] .related-photo-img {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="dark"] .related-photo-item:hover .related-photo-img {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .related-photo-img {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    
+    :root:not([data-theme="light"]) .related-photo-item:hover .related-photo-img {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* Mobile adjustments for related photos */
+@media (max-width: 768px) {
+    .related-photos {
+        text-align: left;
+    }
+    
+    .related-photos-row {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding: 0.5rem 0.5rem 1rem;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-color) transparent;
+    }
+    
+    .related-photos-row::-webkit-scrollbar {
+        height: 6px;
+    }
+    
+    .related-photos-row::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .related-photos-row::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 3px;
+    }
+    
+    .related-photo-img {
+        height: 90px;
+        max-width: 120px;
+    }
+}
+
 .photo-navigation {
     text-align: center;
     padding: 2rem 0;
