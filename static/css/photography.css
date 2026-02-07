@@ -1,29 +1,17 @@
 /* Fonts loaded via Adobe Fonts (Typekit) – jazzier (serif), komet (sans-serif) */
 
-/* Prevent FOUT: hide content until fonts are ready or timeout */
+/* Prevent FOUT: hide content until fonts are ready or timeout (wf-inactive = 3s timeout) */
 html.wf-loading body {
     visibility: hidden;
 }
 html.wf-active body,
 html.wf-inactive body {
     visibility: visible;
-}
-/* Smooth in when fonts are ready */
-html.wf-active body,
-html.wf-inactive body {
-    animation: wf-fade-in 0.15s ease-out;
+    animation: wf-fade-in 0.2s ease-out;
 }
 @keyframes wf-fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
-}
-/* Keep body opaque during loading so we don't flash fallback; opacity is applied only when revealing */
-html.wf-loading body {
-    opacity: 0;
-}
-html.wf-active body,
-html.wf-inactive body {
-    opacity: 1;
 }
 
 /* CSS Custom Properties for Light/Dark Mode */
