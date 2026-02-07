@@ -75,6 +75,11 @@ html.wf-inactive body {
     box-sizing: border-box;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 body {
     font-family: "komet", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     line-height: 1.6;
@@ -82,6 +87,13 @@ body {
     color: var(--text-color);
     background-color: var(--bg-color);
     transition: background-color 0.3s ease, color 0.3s ease;
+    overflow-x: hidden;
+}
+
+/* Prevent images from overflowing containers on iOS Safari */
+img {
+    max-width: 100%;
+    height: auto;
 }
 
 /* Base link styles – prevent default blue when CSS loads; specific links override below */
@@ -103,6 +115,10 @@ body a {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 500 500' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
     mix-blend-mode: multiply;
     transition: opacity 0.3s ease;
+    /* Prevent iOS Safari compositing bugs with fixed + blend-mode */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    will-change: opacity;
 }
 
 /* Dark mode noise - more visible with overlay blend */
@@ -496,7 +512,7 @@ body a {
     }
     
     .photo-item {
-        padding: 0.rem;
+        padding: 0;
     }
 }
 
@@ -602,6 +618,7 @@ body a {
 
 .photo-large {
     max-height: 90vh;
+    max-height: 90svh;
     max-width: 100%;
     width: auto;
     height: auto;
@@ -617,12 +634,14 @@ body a {
 @media (min-width: 769px) {
     .photo-large {
         max-height: 60vh;
+        max-height: 60svh;
         /* max-width: 50vw; */
         cursor: pointer;
     }
 
     .photo-large.expanded {
         max-height: 100vh;
+        max-height: 100svh;
         /* max-width: 80vw; */
     }
 }
