@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const { exec, spawn } = require('child_process');
 const convert = require('heic-convert');
 const sharp = require('sharp');
+const exifr = require('exifr');
 
 const app = express();
 const PORT = 3001;
@@ -83,6 +84,54 @@ async function convertHeicToJpeg(inputPath) {
 function isHeicFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return ext === '.heic' || ext === '.heif';
+}
+
+// Extract EXIF metadata (camera and date taken) from an image file
+async function extractExifMetadata(filePath) {
+  try {
+    const exif = await exifr.parse(filePath, {
+      pick: ['Make', 'Model', 'DateTimeOriginal', 'CreateDate', 'ModifyDate']
+    });
+    
+    if (!exif) return {};
+    
+    const result = {};
+    
+    // Build camera string from Make and Model
+    if (exif.Make || exif.Model) {
+      const make = (exif.Make || '').trim();
+      const model = (exif.Model || '').trim();
+      
+      if (make && model) {
+        // Avoid duplication if model already includes the make (e.g. "Apple iPhone 11 Pro Max")
+        if (model.toLowerCase().startsWith(make.toLowerCase())) {
+          result.camera = model;
+        } else {
+          result.camera = `${make} ${model}`;
+        }
+      } else {
+        result.camera = make || model;
+      }
+    }
+    
+    // Extract date taken (prefer DateTimeOriginal, fall back to CreateDate, then ModifyDate)
+    const dateTaken = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+    if (dateTaken) {
+      // Format as YYYY-MM-DD
+      const d = new Date(dateTaken);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        result.photoDate = `${year}-${month}-${day}`;
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    console.warn('Could not extract EXIF metadata:', error.message);
+    return {};
+  }
 }
 
 // Middleware
@@ -226,6 +275,11 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     // Ensure directory exists
     await fs.ensureDir(photoDir);
 
+    // Extract EXIF metadata from the original file (before any conversion that might strip it)
+    const exifData = await extractExifMetadata(req.file.path);
+    if (exifData.camera) console.log('EXIF camera:', exifData.camera);
+    if (exifData.photoDate) console.log('EXIF date taken:', exifData.photoDate);
+
     // Convert HEIC to JPEG if needed
     let processedFilePath = req.file.path;
     let imageExt = path.extname(req.file.path);
@@ -261,6 +315,14 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     };
     if (tagsArray.length > 0) {
       frontmatter.tags = tagsArray;
+    }
+    
+    // Add EXIF metadata if available
+    if (exifData.camera) {
+      frontmatter.camera = exifData.camera;
+    }
+    if (exifData.photoDate) {
+      frontmatter.photoDate = exifData.photoDate;
     }
     
     const markdownContent = generateFrontmatter(frontmatter, description || '');
