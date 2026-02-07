@@ -485,8 +485,8 @@ body a {
 
 @media (max-width: 480px) {
     .photo-grid:not(.photo-grid-highlighted) {
-        grid-template-columns: 1fr;
-        gap: 0.25rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.01rem;
     }
     
     .photo-item-highlighted {
@@ -496,7 +496,7 @@ body a {
     }
     
     .photo-item {
-        padding: 1rem;
+        padding: 0.rem;
     }
 }
 
