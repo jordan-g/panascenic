@@ -1,6 +1,23 @@
 {
   "albums": [
     {
+      "id": "mlemzc55tkxha",
+      "name": "grandparents' garden",
+      "description": "",
+      "photoSlugs": [
+        "grandparents-garden-1-mlemyo32fcza",
+        "2026-02-09T03-47-58-mlemt67kgbzx",
+        "2026-02-09T03-47-58-mlemt683tdoe"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "grandparents-garden-1-mlemyo32fcza",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-02-09T03:52:45.881Z",
+      "updatedAt": "2026-02-09T03:53:14.596Z"
+    },
+    {
       "id": "mlccohgdzonv0",
       "name": "frosted",
       "description": "",

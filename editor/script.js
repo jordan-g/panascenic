@@ -661,10 +661,10 @@ async function enterGalleryOrderMode() {
         galleryOrder = sortPosts(currentPosts).map(p => p.slug);
     }
     
-    // Add any new posts that aren't in the gallery order
+    // Add any new posts that aren't in the gallery order (at top)
     currentPosts.forEach(post => {
         if (!galleryOrder.includes(post.slug)) {
-            galleryOrder.push(post.slug);
+            galleryOrder.unshift(post.slug);
         }
     });
     

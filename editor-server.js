@@ -330,6 +330,21 @@ app.post('/api/upload', upload.single('photo'), async (req, res) => {
     const markdownPath = path.join(photoDir, 'index.md');
     await fs.writeFile(markdownPath, markdownContent);
 
+    // Prepend new photo to gallery order (new imports at top)
+    const galleryOrderPath = path.join(__dirname, 'data', 'galleryOrder.json');
+    try {
+      await fs.ensureDir(path.dirname(galleryOrderPath));
+      let order = [];
+      if (await fs.pathExists(galleryOrderPath)) {
+        const data = await fs.readFile(galleryOrderPath, 'utf-8');
+        order = (JSON.parse(data).order || []).filter(s => s !== slug);
+      }
+      order.unshift(slug);
+      await fs.writeFile(galleryOrderPath, JSON.stringify({ order }, null, 2));
+    } catch (orderErr) {
+      console.error('Error updating gallery order:', orderErr);
+    }
+
     // Schedule Hugo restart (debounced - waits for batch uploads to complete)
     debouncedHugoRestart();
 
@@ -1496,7 +1511,7 @@ app.post('/api/albums', async (req, res) => {
       updatedAt: new Date().toISOString()
     };
     
-    data.albums.push(newAlbum);
+    data.albums.unshift(newAlbum);
     await saveAlbums(data);
     
     // Create Hugo content page for the album
