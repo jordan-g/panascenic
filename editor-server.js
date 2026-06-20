@@ -136,7 +136,13 @@ async function extractExifMetadata(filePath) {
 
 // Middleware
 app.use(express.json());
-app.use(express.static('editor'));
+app.use(express.static('editor', {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
+}));
 // Serve photos from content/photos directory
 app.use('/photos', express.static(path.join(__dirname, 'content', 'photos')));
 // Serve static assets (e.g. favicon) for editor preview
@@ -551,8 +557,9 @@ async function findThumbnailFile(dir) {
 // Generate framed image with border baked in
 async function generateFramedImage(imagePath, outputPath, frameData) {
   try {
-    const image = sharp(imagePath);
-    const metadata = await image.metadata();
+    const orientedBuffer = await sharp(imagePath).rotate().toBuffer();
+    let pipeline = sharp(orientedBuffer);
+    const metadata = await pipeline.metadata();
     
     // Parse frame color to RGB
     const hexColor = frameData.color || '#FFFFFF';
@@ -565,8 +572,6 @@ async function generateFramedImage(imagePath, outputPath, frameData) {
     const minDimension = Math.min(metadata.width, metadata.height);
     const insetPercent = (frameData.insetWidth || 10) / 100;
     const borderSize = Math.round(minDimension * insetPercent * 0.15); // Scale factor for reasonable border
-    
-    let pipeline = sharp(imagePath);
     
     if (frameData.type === 'even') {
       // Even border on all sides
@@ -643,7 +648,8 @@ async function findFramedImage(dir) {
 // Generate thumbnail from image with crop data
 async function generateThumbnail(imagePath, outputPath, cropData) {
   try {
-    const image = sharp(imagePath);
+    const orientedBuffer = await sharp(imagePath).rotate().toBuffer();
+    const image = sharp(orientedBuffer);
     const metadata = await image.metadata();
     
     // Calculate crop region in pixels
@@ -825,6 +831,8 @@ app.get('/api/posts/:slug', async (req, res) => {
       isDirectory: isDir,
       photoDate: frontmatter.photoDate || '',
       camera: frontmatter.camera || '',
+      lens: frontmatter.lens || '',
+      film: frontmatter.film || '',
       location: frontmatter.location || null
     });
   } catch (error) {
@@ -837,7 +845,7 @@ app.get('/api/posts/:slug', async (req, res) => {
 app.put('/api/posts/:slug', uploadFields, async (req, res) => {
   try {
     const { slug } = req.params;
-    const { title, description, tags, draft, thumbnailCrop, frame, removeDarkMode, removeThumbnail, photoDate, camera, location, date } = req.body;
+    const { title, description, tags, draft, thumbnailCrop, frame, removeDarkMode, removeThumbnail, photoDate, camera, lens, film, location, date } = req.body;
     const photoFile = req.files && req.files['photo'] ? req.files['photo'][0] : null;
     const darkModeFile = req.files && req.files['darkModePhoto'] ? req.files['darkModePhoto'][0] : null;
     
@@ -998,6 +1006,24 @@ app.put('/api/posts/:slug', uploadFields, async (req, res) => {
         frontmatter.camera = camera.trim();
       } else {
         delete frontmatter.camera;
+      }
+    }
+    
+    // Update lens
+    if (lens !== undefined) {
+      if (lens && lens.trim()) {
+        frontmatter.lens = lens.trim();
+      } else {
+        delete frontmatter.lens;
+      }
+    }
+    
+    // Update film
+    if (film !== undefined) {
+      if (film && film.trim()) {
+        frontmatter.film = film.trim();
+      } else {
+        delete frontmatter.film;
       }
     }
     
@@ -1268,6 +1294,14 @@ app.post('/api/posts/batch-update', express.json(), async (req, res) => {
         
         if (updates.camera !== undefined && updates.camera !== '') {
           frontmatter.camera = updates.camera.trim();
+        }
+        
+        if (updates.lens !== undefined && updates.lens !== '') {
+          frontmatter.lens = updates.lens.trim();
+        }
+        
+        if (updates.film !== undefined && updates.film !== '') {
+          frontmatter.film = updates.film.trim();
         }
         
         // Handle location data
@@ -1854,7 +1888,9 @@ app.post('/api/favicon', express.json(), async (req, res) => {
       return res.status(400).json({ error: 'No image found for this photo' });
     }
     const imagePath = path.join(postDir, imageFile);
-    const metadata = await sharp(imagePath).metadata();
+    const orientedBuffer = await sharp(imagePath).rotate().toBuffer();
+    const oriented = sharp(orientedBuffer);
+    const metadata = await oriented.metadata();
     const w = metadata.width;
     const h = metadata.height;
     const x = Math.round(crop.x * w);
@@ -1862,7 +1898,7 @@ app.post('/api/favicon', express.json(), async (req, res) => {
     const size = Math.min(Math.round(crop.width * w), Math.round(crop.height * h), w - x, h - y);
     const faviconSize = 64;
     const circleSvg = `<svg width="${faviconSize}" height="${faviconSize}"><circle cx="${faviconSize / 2}" cy="${faviconSize / 2}" r="${faviconSize / 2}" fill="white"/></svg>`;
-    const cropped = await sharp(imagePath)
+    const cropped = await oriented
       .extract({ left: x, top: y, width: size, height: size })
       .resize(faviconSize, faviconSize)
       .toBuffer();
@@ -1893,7 +1929,10 @@ app.post('/api/favicon', express.json(), async (req, res) => {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok',
+    metadataFields: ['photoDate', 'camera', 'lens', 'film', 'location']
+  });
 });
 
 // Start server

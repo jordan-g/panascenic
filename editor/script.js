@@ -23,6 +23,10 @@ const photoDateInput = document.getElementById('photoDateInput');
 const photoDateGroup = document.getElementById('photoDateGroup');
 const cameraInput = document.getElementById('cameraInput');
 const cameraGroup = document.getElementById('cameraGroup');
+const lensInput = document.getElementById('lensInput');
+const lensGroup = document.getElementById('lensGroup');
+const filmInput = document.getElementById('filmInput');
+const filmGroup = document.getElementById('filmGroup');
 const locationGroup = document.getElementById('locationGroup');
 const locationSearch = document.getElementById('locationSearch');
 const locationResults = document.getElementById('locationResults');
@@ -46,6 +50,17 @@ const batchCount = document.getElementById('batchCount');
 const uploadProgress = document.getElementById('uploadProgress');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
+const uploadQueueHint = document.getElementById('uploadQueueHint');
+const uploadAlbumSection = document.getElementById('uploadAlbumSection');
+const uploadAlbumExisting = document.getElementById('uploadAlbumExisting');
+const uploadAlbumSelect = document.getElementById('uploadAlbumSelect');
+const uploadNewAlbumFields = document.getElementById('uploadNewAlbumFields');
+const uploadAlbumNameInput = document.getElementById('uploadAlbumNameInput');
+const uploadAlbumDescInput = document.getElementById('uploadAlbumDescInput');
+const uploadLayoutOptions = document.getElementById('uploadLayoutOptions');
+const uploadBgColorOptions = document.getElementById('uploadBgColorOptions');
+const uploadBgColorDarkOptions = document.getElementById('uploadBgColorDarkOptions');
+const uploadBgColorDarkRow = document.getElementById('uploadBgColorDarkRow');
 
 // Crop and dark mode elements
 const cropSection = document.getElementById('cropSection');
@@ -99,6 +114,15 @@ let currentFilters = {
 };
 let allAlbums = []; // Cache for album list
 
+// Upload queue state
+let uploadQueue = []; // { id, file, previewUrl }[]
+let uploadQueueIdCounter = 0;
+let draggedUploadItem = null;
+let draggedUploadIndex = null;
+let uploadAlbumLayout = 'horizontal';
+let uploadAlbumBgColor = '';
+let uploadAlbumBgColorDark = '';
+
 // Filter elements
 const searchInput = document.getElementById('searchInput');
 const clearSearchBtn = document.getElementById('clearSearchBtn');
@@ -151,7 +175,22 @@ let frameData = {
 };
 
 // Initialize
+checkServerCapabilities();
 loadPosts();
+
+async function checkServerCapabilities() {
+    try {
+        const response = await fetch('/api/health');
+        if (!response.ok) return;
+        const data = await response.json();
+        const fields = data.metadataFields || [];
+        if (!fields.includes('film') || !fields.includes('lens')) {
+            showListMessage('Editor server is out of date — restart it with npm start to save lens/film metadata.', 'error');
+        }
+    } catch (error) {
+        // Ignore health check failures on load
+    }
+}
 
 // Event listeners
 addPostBtn.addEventListener('click', () => {
@@ -188,60 +227,272 @@ deleteSelectedBtn.addEventListener('click', () => {
     }
 });
 
-// Preview images when selected (supports multiple)
+// Preview images when selected — append to managed upload queue (add mode only)
 photoInput.addEventListener('change', (e) => {
     const files = e.target.files;
-    if (files.length > 0) {
-        if (files.length === 1) {
-            fileName.textContent = files[0].name;
-            batchInfo.style.display = 'none';
-        } else {
-            fileName.textContent = `${files.length} photos selected`;
-            batchCount.textContent = files.length;
-            batchInfo.style.display = 'block';
-        }
-        
-        // Show previews
-        previewGrid.innerHTML = '';
-        const maxPreviews = Math.min(files.length, 12); // Limit preview to 12 images
-        
-        for (let i = 0; i < maxPreviews; i++) {
-            const file = files[i];
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const imgWrapper = document.createElement('div');
-                imgWrapper.className = 'preview-item';
-                imgWrapper.innerHTML = `<img src="${e.target.result}" alt="Preview ${i + 1}">`;
-                previewGrid.appendChild(imgWrapper);
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        if (files.length > maxPreviews) {
-            const moreIndicator = document.createElement('div');
-            moreIndicator.className = 'preview-more';
-            moreIndicator.textContent = `+${files.length - maxPreviews} more`;
-            previewGrid.appendChild(moreIndicator);
-        }
-        
-        previewContainer.style.display = 'block';
-        currentImageContainer.style.display = 'none';
-        
-        // Update button text based on count
-        if (!isEditMode) {
-            submitBtnText.textContent = files.length > 1 
-                ? `Upload ${files.length} Photos` 
-                : 'Upload & Create Post';
-        }
-    } else {
+    if (files.length === 0) return;
+
+    if (isEditMode) {
+        fileName.textContent = files[0].name;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            previewGrid.innerHTML = `<div class="preview-item"><img src="${ev.target.result}" alt="Preview"></div>`;
+            previewContainer.style.display = 'block';
+            currentImageContainer.style.display = 'none';
+        };
+        reader.readAsDataURL(files[0]);
+        return;
+    }
+
+    addFilesToUploadQueue(files);
+    photoInput.value = '';
+});
+
+function addFilesToUploadQueue(files) {
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        uploadQueue.push({
+            id: `upload-${++uploadQueueIdCounter}`,
+            file,
+            previewUrl: URL.createObjectURL(file)
+        });
+    }
+    renderUploadQueue();
+}
+
+function clearUploadQueue() {
+    uploadQueue.forEach(item => URL.revokeObjectURL(item.previewUrl));
+    uploadQueue = [];
+    previewGrid.innerHTML = '';
+    previewContainer.style.display = 'none';
+    batchInfo.style.display = 'none';
+    fileName.textContent = '';
+    updateUploadSubmitButtonText();
+}
+
+function renderUploadQueue() {
+    if (uploadQueue.length === 0) {
         previewContainer.style.display = 'none';
-        fileName.textContent = '';
         batchInfo.style.display = 'none';
-        if (!isEditMode) {
-            submitBtnText.textContent = 'Upload & Create Post';
+        fileName.textContent = '';
+        updateUploadSubmitButtonText();
+        return;
+    }
+
+    previewContainer.style.display = 'block';
+    if (uploadQueueHint) {
+        uploadQueueHint.style.display = uploadQueue.length > 1 ? 'block' : 'none';
+    }
+
+    if (uploadQueue.length === 1) {
+        fileName.textContent = uploadQueue[0].file.name;
+        batchInfo.style.display = 'none';
+    } else {
+        fileName.textContent = `${uploadQueue.length} photos selected`;
+        batchCount.textContent = uploadQueue.length;
+        batchInfo.style.display = 'block';
+    }
+
+    previewGrid.innerHTML = uploadQueue.map((item, index) => `
+        <div class="upload-queue-item" draggable="true" data-index="${index}" data-id="${item.id}">
+            <div class="upload-queue-drag-handle" title="Drag to reorder">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="5" r="1"></circle>
+                    <circle cx="9" cy="12" r="1"></circle>
+                    <circle cx="9" cy="19" r="1"></circle>
+                    <circle cx="15" cy="5" r="1"></circle>
+                    <circle cx="15" cy="12" r="1"></circle>
+                    <circle cx="15" cy="19" r="1"></circle>
+                </svg>
+            </div>
+            <img src="${item.previewUrl}" alt="Preview ${index + 1}">
+            <button type="button" class="upload-queue-remove" onclick="removeFromUploadQueue('${item.id}')" title="Remove">&times;</button>
+            <div class="upload-queue-order">${index + 1}</div>
+        </div>
+    `).join('');
+
+    currentImageContainer.style.display = 'none';
+    initUploadQueueDragDrop();
+    updateUploadSubmitButtonText();
+}
+
+function initUploadQueueDragDrop() {
+    previewGrid.querySelectorAll('.upload-queue-item').forEach(item => {
+        item.addEventListener('dragstart', handleUploadQueueDragStart);
+        item.addEventListener('dragend', handleUploadQueueDragEnd);
+        item.addEventListener('dragover', handleUploadQueueDragOver);
+        item.addEventListener('dragenter', handleUploadQueueDragEnter);
+        item.addEventListener('dragleave', handleUploadQueueDragLeave);
+        item.addEventListener('drop', handleUploadQueueDrop);
+    });
+}
+
+function handleUploadQueueDragStart(e) {
+    draggedUploadItem = this;
+    draggedUploadIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.id);
+}
+
+function handleUploadQueueDragEnd() {
+    this.classList.remove('dragging');
+    draggedUploadItem = null;
+    draggedUploadIndex = null;
+    previewGrid.querySelectorAll('.upload-queue-item').forEach(item => {
+        item.classList.remove('drag-over-left', 'drag-over-right');
+    });
+}
+
+function handleUploadQueueDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleUploadQueueDragEnter(e) {
+    e.preventDefault();
+    if (this !== draggedUploadItem) {
+        const thisIndex = parseInt(this.dataset.index);
+        if (thisIndex < draggedUploadIndex) {
+            this.classList.add('drag-over-left');
+        } else {
+            this.classList.add('drag-over-right');
         }
     }
-});
+}
+
+function handleUploadQueueDragLeave() {
+    this.classList.remove('drag-over-left', 'drag-over-right');
+}
+
+function handleUploadQueueDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (this !== draggedUploadItem) {
+        const fromIndex = draggedUploadIndex;
+        const toIndex = parseInt(this.dataset.index);
+        const [moved] = uploadQueue.splice(fromIndex, 1);
+        uploadQueue.splice(toIndex, 0, moved);
+        renderUploadQueue();
+    }
+}
+
+function removeFromUploadQueue(id) {
+    const index = uploadQueue.findIndex(item => item.id === id);
+    if (index === -1) return;
+    URL.revokeObjectURL(uploadQueue[index].previewUrl);
+    uploadQueue.splice(index, 1);
+    renderUploadQueue();
+}
+
+function updateUploadSubmitButtonText() {
+    if (isEditMode) return;
+    const count = uploadQueue.length;
+    const albumMode = getUploadAlbumMode();
+    let text = count > 1 ? `Upload ${count} Photos` : 'Upload & Create Post';
+    if (albumMode === 'existing') text += ' & Add to Album';
+    else if (albumMode === 'create') text += ' & Create Album';
+    submitBtnText.textContent = text;
+}
+
+function getUploadAlbumMode() {
+    const selected = document.querySelector('input[name="uploadAlbumMode"]:checked');
+    return selected ? selected.value : 'none';
+}
+
+async function loadAlbumsForUploadForm() {
+    if (!uploadAlbumSelect) return;
+    try {
+        const response = await fetch('/api/albums');
+        const data = await response.json();
+        const albums = data.albums || [];
+        uploadAlbumSelect.innerHTML = '<option value="">Select an album...</option>' +
+            albums.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading albums for upload form:', error);
+    }
+}
+
+function resetUploadAlbumSection() {
+    const noneRadio = document.querySelector('input[name="uploadAlbumMode"][value="none"]');
+    if (noneRadio) noneRadio.checked = true;
+    if (uploadAlbumExisting) uploadAlbumExisting.style.display = 'none';
+    if (uploadNewAlbumFields) uploadNewAlbumFields.style.display = 'none';
+    if (uploadAlbumSelect) uploadAlbumSelect.value = '';
+    if (uploadAlbumNameInput) uploadAlbumNameInput.value = '';
+    if (uploadAlbumDescInput) uploadAlbumDescInput.value = '';
+    uploadAlbumLayout = 'horizontal';
+    uploadAlbumBgColor = '';
+    uploadAlbumBgColorDark = '';
+    if (uploadLayoutOptions) {
+        uploadLayoutOptions.querySelectorAll('.layout-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.layout === 'horizontal');
+        });
+    }
+    if (uploadBgColorOptions) {
+        uploadBgColorOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === '');
+        });
+    }
+    if (uploadBgColorDarkOptions) {
+        uploadBgColorDarkOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.color === '');
+        });
+    }
+    if (uploadBgColorDarkRow) uploadBgColorDarkRow.style.display = 'none';
+    updateUploadSubmitButtonText();
+}
+
+function initUploadAlbumHandlers() {
+    document.querySelectorAll('input[name="uploadAlbumMode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const mode = getUploadAlbumMode();
+            if (uploadAlbumExisting) uploadAlbumExisting.style.display = mode === 'existing' ? 'block' : 'none';
+            if (uploadNewAlbumFields) uploadNewAlbumFields.style.display = mode === 'create' ? 'block' : 'none';
+            if (mode === 'existing') loadAlbumsForUploadForm();
+            updateUploadSubmitButtonText();
+        });
+    });
+
+    if (uploadLayoutOptions) {
+        uploadLayoutOptions.addEventListener('click', (e) => {
+            const option = e.target.closest('.layout-option');
+            if (!option) return;
+            uploadAlbumLayout = option.dataset.layout;
+            uploadLayoutOptions.querySelectorAll('.layout-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.layout === uploadAlbumLayout);
+            });
+        });
+    }
+
+    if (uploadBgColorOptions) {
+        uploadBgColorOptions.addEventListener('click', (e) => {
+            const btn = e.target.closest('.bg-color-btn');
+            if (!btn) return;
+            uploadAlbumBgColor = btn.dataset.color;
+            uploadBgColorOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.color === uploadAlbumBgColor);
+            });
+            if (uploadBgColorDarkRow) {
+                uploadBgColorDarkRow.style.display = uploadAlbumBgColor ? 'flex' : 'none';
+            }
+        });
+    }
+
+    if (uploadBgColorDarkOptions) {
+        uploadBgColorDarkOptions.addEventListener('click', (e) => {
+            const btn = e.target.closest('.bg-color-btn');
+            if (!btn) return;
+            uploadAlbumBgColorDark = btn.dataset.color;
+            uploadBgColorDarkOptions.querySelectorAll('.bg-color-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.color === uploadAlbumBgColorDark);
+            });
+        });
+    }
+}
+
+initUploadAlbumHandlers();
 
 // Handle form submission
 form.addEventListener('submit', async (e) => {
@@ -251,7 +502,7 @@ form.addEventListener('submit', async (e) => {
     message.style.display = 'none';
     
     // Validate form - photo required for new posts (unless editing)
-    if (!isEditMode && (!photoInput.files || photoInput.files.length === 0)) {
+    if (!isEditMode && uploadQueue.length === 0) {
         showMessage('Please select at least one photo', 'error');
         return;
     }
@@ -264,12 +515,8 @@ form.addEventListener('submit', async (e) => {
     try {
         if (isEditMode) {
             await updatePost();
-        } else if (photoInput.files.length > 1) {
-            // Batch upload
-            await batchUpload();
         } else {
-            // Single upload
-            await createPost();
+            await uploadPhotos();
         }
     } catch (error) {
         console.error('Form submission error:', error);
@@ -1447,14 +1694,14 @@ function showFormView() {
     deleteBtn.style.display = 'none';
     draftGroup.style.display = 'none';
     form.reset();
-    previewContainer.style.display = 'none';
-    previewGrid.innerHTML = '';
+    clearUploadQueue();
+    resetUploadAlbumSection();
+    loadAlbumsForUploadForm();
+    if (uploadAlbumSection) uploadAlbumSection.style.display = 'block';
     currentImageContainer.style.display = 'none';
-    fileName.textContent = '';
     fileInputText.textContent = 'Choose photos (you can select multiple)';
     photoInput.required = false; // Title not required anymore
     photoInput.multiple = true;
-    batchInfo.style.display = 'none';
     uploadProgress.style.display = 'none';
     message.style.display = 'none';
     
@@ -1484,15 +1731,13 @@ async function editPost(slug) {
         photoInput.required = false;
         photoInput.multiple = false; // Single file for edits
         fileInputText.textContent = 'Choose a new photo (optional)';
-        batchInfo.style.display = 'none';
+        if (uploadAlbumSection) uploadAlbumSection.style.display = 'none';
+        clearUploadQueue();
         uploadProgress.style.display = 'none';
         message.style.display = 'none';
         
         // Reset file input
         photoInput.value = '';
-        fileName.textContent = '';
-        previewContainer.style.display = 'none';
-        previewGrid.innerHTML = '';
         
         // Reset dark mode state
         darkModeInput.value = '';
@@ -1513,12 +1758,16 @@ async function editPost(slug) {
         tagsInput.value = (data.tags || []).join(', ');
         draftInput.checked = data.draft || false;
         
-        // Show and populate photo date, camera, and location fields
+        // Show and populate photo date, camera, lens, film, and location fields
         photoDateGroup.style.display = 'block';
         cameraGroup.style.display = 'block';
+        lensGroup.style.display = 'block';
+        filmGroup.style.display = 'block';
         locationGroup.style.display = 'block';
         photoDateInput.value = toDateInputValue(data.photoDate || '') || '';
         cameraInput.value = data.camera || '';
+        lensInput.value = data.lens || '';
+        filmInput.value = data.film || '';
         
         // Populate location if exists
         if (data.location && data.location.name) {
@@ -1577,11 +1826,8 @@ function showManagementView() {
     // Reset form state
     form.reset();
     photoInput.value = '';
-    fileName.textContent = '';
-    previewContainer.style.display = 'none';
-    previewGrid.innerHTML = '';
+    clearUploadQueue();
     currentImageContainer.style.display = 'none';
-    batchInfo.style.display = 'none';
     uploadProgress.style.display = 'none';
     
     // Reset crop, dark mode, and frame state
@@ -1596,9 +1842,11 @@ function showManagementView() {
     frameSection.style.display = 'none';
     resetFrameData();
     
-    // Hide photo date, camera, and location fields (only shown in edit mode)
+    // Hide photo date, camera, lens, film, and location fields (only shown in edit mode)
     photoDateGroup.style.display = 'none';
     cameraGroup.style.display = 'none';
+    lensGroup.style.display = 'none';
+    filmGroup.style.display = 'none';
     locationGroup.style.display = 'none';
     clearLocation();
     
@@ -1607,85 +1855,180 @@ function showManagementView() {
     loadPosts();
 }
 
-// Create new post (single upload)
-async function createPost() {
-    const formData = new FormData();
-    formData.append('photo', photoInput.files[0]);
-    formData.append('title', titleInput.value.trim());
-    formData.append('description', descriptionInput.value.trim());
-    formData.append('tags', tagsInput.value.trim());
-    
-    const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-    });
-    
-    const data = await response.json();
-    
-    if (response.ok) {
-        showMessage('Photo uploaded successfully!', 'success');
-        setTimeout(() => showManagementView(), 1000);
-    } else {
-        showMessage(data.error || 'Failed to upload photo', 'error');
-    }
-}
+// Upload photos from queue (single unified path)
+async function uploadPhotos() {
+    const albumMode = getUploadAlbumMode();
 
-// Batch upload multiple photos
-async function batchUpload() {
-    const files = photoInput.files;
-    const total = files.length;
+    if (albumMode === 'create') {
+        const albumName = uploadAlbumNameInput.value.trim();
+        if (!albumName) {
+            showMessage('Album name is required when creating a new album', 'error');
+            return;
+        }
+    }
+    if (albumMode === 'existing' && !uploadAlbumSelect.value) {
+        showMessage('Please select an album', 'error');
+        return;
+    }
+
+    const total = uploadQueue.length;
     let completed = 0;
     let failed = 0;
-    
-    uploadProgress.style.display = 'block';
-    progressFill.style.width = '0%';
-    progressText.textContent = `Uploading 0 of ${total}...`;
-    
+    const newSlugs = [];
+
     const title = titleInput.value.trim();
     const description = descriptionInput.value.trim();
     const tags = tagsInput.value.trim();
-    
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+
+    if (total > 1) {
+        uploadProgress.style.display = 'block';
+        progressFill.style.width = '0%';
+        progressText.textContent = `Uploading 0 of ${total}...`;
+    }
+
+    for (let i = 0; i < total; i++) {
+        const item = uploadQueue[i];
         const formData = new FormData();
-        formData.append('photo', file);
-        // For batch, append index to title if title provided
-        const photoTitle = title ? (files.length > 1 ? `${title} ${i + 1}` : title) : '';
+        formData.append('photo', item.file);
+        const photoTitle = title ? (total > 1 ? `${title} ${i + 1}` : title) : '';
         formData.append('title', photoTitle);
         formData.append('description', description);
         formData.append('tags', tags);
-        
+
         try {
             const response = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
-            
-            if (response.ok) {
+            const data = await response.json();
+
+            if (response.ok && data.slug) {
                 completed++;
+                newSlugs.push(data.slug);
             } else {
                 failed++;
             }
         } catch (error) {
             failed++;
-            console.error('Upload error for file:', file.name, error);
+            console.error('Upload error for file:', item.file.name, error);
         }
-        
-        // Update progress
-        const progress = ((i + 1) / total) * 100;
-        progressFill.style.width = `${progress}%`;
-        progressText.textContent = `Uploading ${i + 1} of ${total}...`;
+
+        if (total > 1) {
+            const progress = ((i + 1) / total) * 100;
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `Uploading ${i + 1} of ${total}...`;
+        }
     }
-    
+
     uploadProgress.style.display = 'none';
-    
+
+    if (newSlugs.length === 0) {
+        showMessage('Failed to upload photos', 'error');
+        return;
+    }
+
+    await fixGalleryOrderAfterUpload(newSlugs);
+
+    if (albumMode !== 'none') {
+        try {
+            await assignUploadedPhotosToAlbum(newSlugs, albumMode);
+        } catch (error) {
+            console.error('Album assignment error:', error);
+            showMessage(`Uploaded ${completed} photo${completed > 1 ? 's' : ''}, but album assignment failed`, 'error');
+            setTimeout(() => showManagementView(), 1500);
+            return;
+        }
+    }
+
     if (failed === 0) {
-        showMessage(`Successfully uploaded ${completed} photo${completed > 1 ? 's' : ''}!`, 'success');
+        let msg = `Successfully uploaded ${completed} photo${completed > 1 ? 's' : ''}`;
+        if (albumMode === 'existing') msg += ' and added to album';
+        else if (albumMode === 'create') msg += ' and created album';
+        showMessage(msg + '!', 'success');
     } else {
         showMessage(`Uploaded ${completed} of ${total} photos. ${failed} failed.`, 'error');
     }
-    
+
+    clearUploadQueue();
     setTimeout(() => showManagementView(), 1500);
+}
+
+async function fixGalleryOrderAfterUpload(newSlugs) {
+    try {
+        const response = await fetch('/api/gallery-order');
+        const data = await response.json();
+        let order = data.order || [];
+        const newSlugSet = new Set(newSlugs);
+        order = order.filter(s => !newSlugSet.has(s));
+        order = [...newSlugs, ...order];
+
+        await fetch('/api/gallery-order', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order })
+        });
+        galleryOrder = order;
+        try {
+            localStorage.setItem('galleryOrder', JSON.stringify(galleryOrder));
+        } catch (e) {
+            console.error('Error saving gallery order to localStorage:', e);
+        }
+    } catch (error) {
+        console.error('Error fixing gallery order:', error);
+    }
+}
+
+async function assignUploadedPhotosToAlbum(newSlugs, albumMode) {
+    if (albumMode === 'existing') {
+        const albumId = uploadAlbumSelect.value;
+        const response = await fetch(`/api/albums/${albumId}`);
+        const album = await response.json();
+        if (!response.ok) throw new Error(album.error || 'Failed to load album');
+
+        const existingSlugs = album.photoSlugs || [];
+        const merged = [...existingSlugs];
+        newSlugs.forEach(slug => {
+            if (!merged.includes(slug)) merged.push(slug);
+        });
+
+        const updateResponse = await fetch(`/api/albums/${albumId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: album.name,
+                description: album.description,
+                photoSlugs: merged,
+                layout: album.layout,
+                thumbnailSlug: album.thumbnailSlug,
+                stackedPreview: album.stackedPreview,
+                bgColor: album.bgColor,
+                bgColorDark: album.bgColorDark
+            })
+        });
+        if (!updateResponse.ok) {
+            const data = await updateResponse.json();
+            throw new Error(data.error || 'Failed to update album');
+        }
+    } else if (albumMode === 'create') {
+        const response = await fetch('/api/albums', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: uploadAlbumNameInput.value.trim(),
+                description: uploadAlbumDescInput.value.trim(),
+                photoSlugs: newSlugs,
+                layout: uploadAlbumLayout,
+                thumbnailSlug: newSlugs[0],
+                stackedPreview: true,
+                bgColor: uploadAlbumBgColor || null,
+                bgColorDark: uploadAlbumBgColorDark || null
+            })
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to create album');
+        }
+    }
 }
 
 // Update existing post
@@ -1703,6 +2046,8 @@ async function updatePost() {
     formData.append('draft', draftInput.checked);
     formData.append('photoDate', photoDateInput.value.trim());
     formData.append('camera', cameraInput.value.trim());
+    formData.append('lens', lensInput.value.trim());
+    formData.append('film', filmInput.value.trim());
     formData.append('location', currentLocation ? JSON.stringify(currentLocation) : '');
     
     // Thumbnail: either remove it or send crop data (only if user explicitly modified it)
@@ -2905,6 +3250,10 @@ async function loadAlbums() {
     }
 }
 
+function getPostPreviewSrc(post) {
+    return post.thumbnail || post.image || '';
+}
+
 // Render albums
 function renderAlbums(albums) {
     // Create a map of posts for quick lookup
@@ -2916,14 +3265,20 @@ function renderAlbums(albums) {
     albumsList.innerHTML = albums.map((album, index) => {
         const photoCount = album.photoSlugs ? album.photoSlugs.length : 0;
         
-        // Get preview images (up to 4)
+        // Get preview images (stacked: up to 3 others + thumbnail on top)
         const previewImages = [];
-        if (album.photoSlugs) {
-            for (let i = 0; i < Math.min(4, album.photoSlugs.length); i++) {
-                const post = postsMap[album.photoSlugs[i]];
-                if (post && post.image) {
-                    previewImages.push(post.image);
-                }
+        if (album.photoSlugs && album.photoSlugs.length > 0) {
+            let orderedSlugs;
+            if (album.stackedPreview !== false && album.thumbnailSlug) {
+                const others = album.photoSlugs.filter(s => s !== album.thumbnailSlug).slice(0, 3);
+                orderedSlugs = [...others, album.thumbnailSlug];
+            } else {
+                orderedSlugs = album.photoSlugs.slice(0, 4);
+            }
+            for (const slug of orderedSlugs) {
+                const post = postsMap[slug];
+                const src = getPostPreviewSrc(post);
+                if (src) previewImages.push(src);
             }
         }
         
@@ -3319,21 +3674,22 @@ function updateThumbnailPreview(postsMap) {
         // Background photos
         otherSlugs.forEach((slug, i) => {
             const otherPost = postsMap[slug];
-            if (otherPost && otherPost.image) {
+            const src = getPostPreviewSrc(otherPost);
+            if (src) {
                 const rotation = (i % 2 === 0 ? -1 : 1) * (4 + i * 2);
                 const translate = (i % 2 === 0 ? -1 : 1) * (3 + i * 2);
-                stackHtml += `<img src="${otherPost.image}" class="thumbnail-preview-stacked" style="transform: rotate(${rotation}deg) translate(${translate}px, ${translate}px); z-index: ${i};">`;
+                stackHtml += `<img src="${src}" class="thumbnail-preview-stacked" style="transform: rotate(${rotation}deg) translate(${translate}px, ${translate}px); z-index: ${i};">`;
             }
         });
         
         // Top photo (thumbnail)
-        stackHtml += `<img src="${post.image}" class="thumbnail-preview-top" style="z-index: 10;">`;
+        stackHtml += `<img src="${getPostPreviewSrc(post)}" class="thumbnail-preview-top" style="z-index: 10;">`;
         
         thumbnailPreview.innerHTML = stackHtml;
         thumbnailPreview.classList.add('stacked');
     } else {
         // Single photo preview
-        thumbnailPreview.innerHTML = `<img src="${post.image}" class="thumbnail-preview-single">`;
+        thumbnailPreview.innerHTML = `<img src="${getPostPreviewSrc(post)}" class="thumbnail-preview-single">`;
         thumbnailPreview.classList.remove('stacked');
     }
 }
@@ -3769,6 +4125,8 @@ const bulkTitleInput = document.getElementById('bulkTitleInput');
 const bulkDescriptionInput = document.getElementById('bulkDescriptionInput');
 const bulkPhotoDateInput = document.getElementById('bulkPhotoDateInput');
 const bulkCameraInput = document.getElementById('bulkCameraInput');
+const bulkLensInput = document.getElementById('bulkLensInput');
+const bulkFilmInput = document.getElementById('bulkFilmInput');
 const bulkFrameTypeOptions = document.getElementById('bulkFrameTypeOptions');
 const bulkInsetWidthGroup = document.getElementById('bulkInsetWidthGroup');
 const bulkInsetWidthSlider = document.getElementById('bulkInsetWidthSlider');
@@ -3892,6 +4250,8 @@ function openBulkEditModal() {
     bulkDescriptionInput.value = '';
     bulkPhotoDateInput.value = '';
     bulkCameraInput.value = '';
+    bulkLensInput.value = '';
+    bulkFilmInput.value = '';
     resetBulkFrameData();
     resetBulkLocation();
     
@@ -3937,6 +4297,12 @@ async function applyBulkEdit() {
     }
     if (bulkCameraInput.value.trim()) {
         updates.camera = bulkCameraInput.value.trim();
+    }
+    if (bulkLensInput.value.trim()) {
+        updates.lens = bulkLensInput.value.trim();
+    }
+    if (bulkFilmInput.value.trim()) {
+        updates.film = bulkFilmInput.value.trim();
     }
     
     // Handle frame settings

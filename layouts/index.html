@@ -61,13 +61,18 @@
                                         {{ end }}
                                     {{ end }}
                                     {{ if $photo }}
+                                        {{ $customThumbnail := $photo.Resources.GetMatch "thumbnail.*" }}
                                         {{ $image := "" }}
                                         {{ range $photo.Resources.ByType "image" }}
                                             {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
                                                 {{ $image = . }}
                                             {{ end }}
                                         {{ end }}
-                                        {{ if $image }}
+                                        {{ if $customThumbnail }}
+                                            {{ $thumb := $customThumbnail.Fit "150x150" }}
+                                            <img src="{{ $thumb.RelPermalink }}" alt="" class="album-preview-img" loading="lazy">
+                                            {{ $previewCount = add $previewCount 1 }}
+                                        {{ else if $image }}
                                             {{ $thumb := $image.Fit "150x150" }}
                                             <img src="{{ $thumb.RelPermalink }}" alt="" class="album-preview-img" loading="lazy">
                                             {{ $previewCount = add $previewCount 1 }}
@@ -79,13 +84,17 @@
                                 {{ $thumbSlugToUse := $thumbnailSlug | default (index .photoSlugs 0) }}
                                 {{ range where $.Site.RegularPages "Section" "photos" }}
                                     {{ if eq (path.Base .File.Dir) $thumbSlugToUse }}
+                                        {{ $customThumbnail := .Resources.GetMatch "thumbnail.*" }}
                                         {{ $image := "" }}
                                         {{ range .Resources.ByType "image" }}
                                             {{ if and (not $image) (not (hasPrefix .Name "image-dark")) (not (hasPrefix .Name "thumbnail")) }}
                                                 {{ $image = . }}
                                             {{ end }}
                                         {{ end }}
-                                        {{ if $image }}
+                                        {{ if $customThumbnail }}
+                                            {{ $thumb := $customThumbnail.Fit "150x150" }}
+                                            <img src="{{ $thumb.RelPermalink }}" alt="{{ $album.name }}" class="album-thumbnail-custom" loading="lazy">
+                                        {{ else if $image }}
                                             {{ $thumb := $image.Fit "150x150" }}
                                             <img src="{{ $thumb.RelPermalink }}" alt="{{ $album.name }}" class="album-thumbnail-custom" loading="lazy">
                                         {{ end }}

@@ -1,6 +1,358 @@
 {
   "albums": [
     {
+      "id": "mqlmro5ftn6cx",
+      "name": "empty days",
+      "description": "",
+      "photoSlugs": [
+        "empty-days-1-mqlmro23g0oo",
+        "empty-days-2-mqlmro312riz",
+        "empty-days-3-mqlmro3mb8bj",
+        "empty-days-4-mqlmro44g1ht",
+        "empty-days-5-mqlmro4v7rwh"
+      ],
+      "layout": "vertical",
+      "thumbnailSlug": "empty-days-1-mqlmro23g0oo",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:39:43.107Z",
+      "updatedAt": "2026-06-20T00:39:43.107Z"
+    },
+    {
+      "id": "mqlmq71u5apaj",
+      "name": "fresh air",
+      "description": "",
+      "photoSlugs": [
+        "fresh-air-1-mqlmq6zs7ayp",
+        "fresh-air-2-mqlmq70676se",
+        "fresh-air-3-mqlmq70di35t",
+        "fresh-air-4-mqlmq70mql1y",
+        "fresh-air-5-mqlmq70stk77",
+        "fresh-air-6-mqlmq70ym7ty",
+        "fresh-air-7-mqlmq7162nej",
+        "fresh-air-8-mqlmq71dwb7m",
+        "fresh-air-9-mqlmq71lrw6f"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "fresh-air-1-mqlmq6zs7ayp",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:38:34.290Z",
+      "updatedAt": "2026-06-20T00:38:34.290Z"
+    },
+    {
+      "id": "mqlmoq6q0z6ir",
+      "name": "sunnny day",
+      "description": "",
+      "photoSlugs": [
+        "sunnny-day-1-mqlmoq553zxb",
+        "sunnny-day-2-mqlmoq5prrte",
+        "sunnny-day-3-mqlmoq60z8mk",
+        "sunnny-day-4-mqlmoq67batr",
+        "sunnny-day-5-mqlmoq6dqsjm",
+        "sunnny-day-6-mqlmoq6iq3md"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "sunnny-day-1-mqlmoq553zxb",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:37:25.778Z",
+      "updatedAt": "2026-06-20T00:37:25.778Z"
+    },
+    {
+      "id": "mqlmmirfgsx3x",
+      "name": "textures & shadows",
+      "description": "",
+      "photoSlugs": [
+        "textures-shadows-1-mqlmmiq2vzyx",
+        "textures-shadows-2-mqlmmiqkycng",
+        "textures-shadows-3-mqlmmiqr8bar",
+        "textures-shadows-4-mqlmmiqycs9b",
+        "textures-shadows-5-mqlmmir63633"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "textures-shadows-1-mqlmmiq2vzyx",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:35:42.843Z",
+      "updatedAt": "2026-06-20T00:35:42.843Z"
+    },
+    {
+      "id": "mqlmi3xrmlq2k",
+      "name": "waiting for the ball",
+      "description": "",
+      "photoSlugs": [
+        "waiting-for-the-ball-1-mqlmi3wiicp9",
+        "waiting-for-the-ball-2-mqlmi3x2h08m",
+        "waiting-for-the-ball-3-mqlmi3xfekdj"
+      ],
+      "layout": "vertical",
+      "thumbnailSlug": "waiting-for-the-ball-1-mqlmi3wiicp9",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:32:17.007Z",
+      "updatedAt": "2026-06-20T00:32:17.007Z"
+    },
+    {
+      "id": "mqlmhdg5pa597",
+      "name": "blue & green",
+      "description": "",
+      "photoSlugs": [
+        "blue-green-1-mqlmhddygrxk",
+        "blue-green-2-mqlmhdeeswcs",
+        "blue-green-3-mqlmhdepowtv",
+        "blue-green-4-mqlmhdf5sg51",
+        "blue-green-5-mqlmhdfhijfh",
+        "blue-green-6-mqlmhdfpjrp5",
+        "blue-green-7-mqlmhdfwjwns"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "blue-green-1-mqlmhddygrxk",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:31:42.677Z",
+      "updatedAt": "2026-06-20T00:31:42.677Z"
+    },
+    {
+      "id": "mqlmfoj6cb68p",
+      "name": "still blue",
+      "description": "",
+      "photoSlugs": [
+        "still-blue-1-mqlmfoh22sk2",
+        "still-blue-2-mqlmfohzpvb9",
+        "still-blue-3-mqlmfoiu56mh"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "still-blue-1-mqlmfoh22sk2",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:30:23.730Z",
+      "updatedAt": "2026-06-20T00:30:23.730Z"
+    },
+    {
+      "id": "mqlmf5he7kmm7",
+      "name": "quiet day in Kamakura",
+      "description": "",
+      "photoSlugs": [
+        "quiet-day-in-kamakura-1-mqlmf5bbip8m",
+        "quiet-day-in-kamakura-2-mqlmf5cn6i3t",
+        "quiet-day-in-kamakura-3-mqlmf5duv9le",
+        "quiet-day-in-kamakura-4-mqlmf5el9b47",
+        "quiet-day-in-kamakura-5-mqlmf5fhvoy7",
+        "quiet-day-in-kamakura-6-mqlmf5g3eibd",
+        "quiet-day-in-kamakura-7-mqlmf5gydws1"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "quiet-day-in-kamakura-1-mqlmf5bbip8m",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:29:59.042Z",
+      "updatedAt": "2026-06-20T00:29:59.042Z"
+    },
+    {
+      "id": "mqlmdqwtsw1qz",
+      "name": "a day in Okinawa",
+      "description": "",
+      "photoSlugs": [
+        "a-day-in-okinawa-1-mqlmdqqpe63i",
+        "a-day-in-okinawa-2-mqlmdqrtvyk8",
+        "a-day-in-okinawa-3-mqlmdqsj6she",
+        "a-day-in-okinawa-4-mqlmdqt9176s",
+        "a-day-in-okinawa-5-mqlmdqtpvozl",
+        "a-day-in-okinawa-6-mqlmdquaz5gd",
+        "a-day-in-okinawa-7-mqlmdquy332h",
+        "a-day-in-okinawa-8-mqlmdqw60r6z"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "a-day-in-okinawa-1-mqlmdqqpe63i",
+      "stackedPreview": true,
+      "bgColor": "#000000",
+      "bgColorDark": "#000000",
+      "createdAt": "2026-06-20T00:28:53.501Z",
+      "updatedAt": "2026-06-20T00:28:53.501Z"
+    },
+    {
+      "id": "mqlmac2ee2j3c",
+      "name": "curiosities",
+      "description": "",
+      "photoSlugs": [
+        "curiosities-1-mqlmac0e2eqd",
+        "curiosities-2-mqlmac156oky",
+        "curiosities-3-mqlmac1im4ja",
+        "curiosities-4-mqlmac1uxv2p",
+        "curiosities-5-mqlmac22j8wd"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "curiosities-1-mqlmac0e2eqd",
+      "stackedPreview": true,
+      "bgColor": "#000000",
+      "bgColorDark": "#000000",
+      "createdAt": "2026-06-20T00:26:14.294Z",
+      "updatedAt": "2026-06-20T00:26:14.294Z"
+    },
+    {
+      "id": "mqlm428aacu8u",
+      "name": "city walk",
+      "description": "",
+      "photoSlugs": [
+        "city-walk-1-mqlm425l4olr",
+        "city-walk-2-mqlm42654vjy",
+        "city-walk-3-mqlm427171va",
+        "city-walk-4-mqlm427b4fsq",
+        "city-walk-5-mqlm427lolvv"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "city-walk-1-mqlm425l4olr",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-20T00:21:21.610Z",
+      "updatedAt": "2026-06-20T00:21:21.610Z"
+    },
+    {
+      "id": "mqlkddruo3ifi",
+      "name": "April in my heart",
+      "description": "",
+      "photoSlugs": [
+        "april-in-my-heart-1-mqlkddpzpvw1",
+        "april-in-my-heart-2-mqlkddqbnan2",
+        "april-in-my-heart-3-mqlkddqj2fsy",
+        "april-in-my-heart-4-mqlkddqvfof6",
+        "april-in-my-heart-5-mqlkddrahizp",
+        "april-in-my-heart-6-mqlkddrk6pmt"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "april-in-my-heart-1-mqlkddpzpvw1",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-19T23:32:37.242Z",
+      "updatedAt": "2026-06-19T23:32:37.242Z"
+    },
+    {
+      "id": "mqlkc1gp76ea5",
+      "name": "glass eyes",
+      "description": "",
+      "photoSlugs": [
+        "glass-eyes-1-mqlkc1du3dko",
+        "glass-eyes-2-mqlkc1fdm4aw",
+        "glass-eyes-3-mqlkc1fr9o64",
+        "glass-eyes-4-mqlkc1g94dhl"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "glass-eyes-1-mqlkc1du3dko",
+      "stackedPreview": true,
+      "bgColor": "#000000",
+      "bgColorDark": "#000000",
+      "createdAt": "2026-06-19T23:31:34.633Z",
+      "updatedAt": "2026-06-19T23:31:34.633Z"
+    },
+    {
+      "id": "mqlis340bfjoj",
+      "name": "twilight dream",
+      "description": "",
+      "photoSlugs": [
+        "twilight-dream-1-mqlis303xphg",
+        "twilight-dream-2-mqlis321c1s6",
+        "twilight-dream-3-mqlis32j5879",
+        "twilight-dream-4-mqlis32w3nvt",
+        "twilight-dream-5-mqlis33jo8go"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "twilight-dream-1-mqlis303xphg",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-19T22:48:04.032Z",
+      "updatedAt": "2026-06-19T22:48:04.032Z"
+    },
+    {
+      "id": "mqlir5cldaihk",
+      "name": "color swirl",
+      "description": "",
+      "photoSlugs": [
+        "color-swirl-1-mqlir544dchk",
+        "color-swirl-2-mqlir55kd1s5",
+        "color-swirl-3-mqlir56syxsb",
+        "color-swirl-4-mqlir58jbdpy",
+        "color-swirl-5-mqlir5b19z01"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "color-swirl-1-mqlir544dchk",
+      "stackedPreview": true,
+      "bgColor": "#FFFFFF",
+      "bgColorDark": "#FFFFFF",
+      "createdAt": "2026-06-19T22:47:20.277Z",
+      "updatedAt": "2026-06-19T22:47:20.277Z"
+    },
+    {
+      "id": "mqlipz1t59pc9",
+      "name": "crystal volcano",
+      "description": "",
+      "photoSlugs": [
+        "crystal-volcano-1-mqlipyzdvwen",
+        "crystal-volcano-2-mqlipz04k7p6",
+        "crystal-volcano-3-mqlipz0z8dp4",
+        "crystal-volcano-4-mqlipz1e3wzk"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "crystal-volcano-1-mqlipyzdvwen",
+      "stackedPreview": true,
+      "bgColor": null,
+      "bgColorDark": null,
+      "createdAt": "2026-06-19T22:46:25.457Z",
+      "updatedAt": "2026-06-19T22:46:25.457Z"
+    },
+    {
+      "id": "mqlinwdrktjas",
+      "name": "last frost",
+      "description": "",
+      "photoSlugs": [
+        "last-frost-1-mqlinwcie4xd",
+        "last-frost-2-mqlinwcw34ep",
+        "last-frost-3-mqlinwd4227f",
+        "last-frost-4-mqlinwda8dp7",
+        "last-frost-5-mqlinwdip7tq"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "last-frost-1-mqlinwcie4xd",
+      "stackedPreview": true,
+      "bgColor": "#FFFFFF",
+      "bgColorDark": "#FFFFFF",
+      "createdAt": "2026-06-19T22:44:48.687Z",
+      "updatedAt": "2026-06-19T22:44:48.687Z"
+    },
+    {
+      "id": "mqli2hnk8z43s",
+      "name": "shape & color experiments",
+      "description": "",
+      "photoSlugs": [
+        "shape-colour-experiments-7-mqlhzbclnk1p",
+        "shape-colour-experiments-8-mqlhzbcrluy6",
+        "shape-colour-experiments-1-mqlhzbb0qu3c",
+        "shape-colour-experiments-2-mqlhzbbj8vgt",
+        "shape-colour-experiments-4-mqlhzbc08cl2",
+        "shape-colour-experiments-5-mqlhzbc6wumm",
+        "shape-colour-experiments-6-mqlhzbcehap6",
+        "shape-colour-experiments-3-mqlhzbbs2oh5"
+      ],
+      "layout": "horizontal",
+      "thumbnailSlug": "shape-colour-experiments-7-mqlhzbclnk1p",
+      "stackedPreview": true,
+      "bgColor": "#000000",
+      "bgColorDark": "#000000",
+      "createdAt": "2026-06-19T22:28:09.825Z",
+      "updatedAt": "2026-06-19T22:33:46.860Z"
+    },
+    {
       "id": "mmqeq6skqb5yh",
       "name": "Kamakura",
       "description": "",

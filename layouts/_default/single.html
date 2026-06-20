@@ -46,7 +46,8 @@
                 {{ .Content }}
             </div>
             {{ end }}
-            {{ if or .Params.photoDate .Params.camera .Params.location }}
+            {{ if or .Params.photoDate .Params.camera .Params.lens .Params.film .Params.location }}
+            {{ if or .Params.photoDate .Params.location .Params.camera }}
             <div class="photo-meta">
                 {{ if .Params.photoDate }}
                 <span class="photo-meta-item photo-date">
@@ -59,15 +60,6 @@
                     {{ dateFormat "January 2, 2006" .Params.photoDate }}
                 </span>
                 {{ end }}
-                {{ if .Params.camera }}
-                <span class="photo-meta-item photo-camera">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                        <circle cx="12" cy="13" r="4"></circle>
-                    </svg>
-                    {{ .Params.camera }}
-                </span>
-                {{ end }}
                 {{ if .Params.location }}
                 <a href="https://www.openstreetmap.org/?mlat={{ .Params.location.lat }}&mlon={{ .Params.location.lng }}#map=15/{{ .Params.location.lat }}/{{ .Params.location.lng }}" target="_blank" rel="noopener" class="photo-meta-item photo-location">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -77,7 +69,40 @@
                     {{ .Params.location.name }}
                 </a>
                 {{ end }}
+                {{ if .Params.camera }}
+                <span class="photo-meta-item photo-camera">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    {{ .Params.camera }}
+                </span>
+                {{ end }}
             </div>
+            {{ end }}
+            {{ if or .Params.lens .Params.film }}
+            <div class="photo-meta photo-meta-equipment">
+                {{ if .Params.lens }}
+                <span class="photo-meta-item photo-lens">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="4"></circle>
+                    </svg>
+                    {{ .Params.lens }}
+                </span>
+                {{ end }}
+                {{ if .Params.film }}
+                <span class="photo-meta-item photo-film">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                        <line x1="7" y1="2" x2="7" y2="22"></line>
+                        <line x1="17" y1="2" x2="17" y2="22"></line>
+                    </svg>
+                    {{ .Params.film }}
+                </span>
+                {{ end }}
+            </div>
+            {{ end }}
             {{ end }}
         </div>
         

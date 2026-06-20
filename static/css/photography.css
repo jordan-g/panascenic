@@ -681,6 +681,14 @@ body a {
     opacity: 0.7;
 }
 
+.photo-meta-equipment {
+    margin-top: 0.5rem;
+}
+
+.photo-meta-equipment:first-child {
+    margin-top: 1.5rem;
+}
+
 .photo-meta-item {
     display: inline-flex;
     align-items: center;
